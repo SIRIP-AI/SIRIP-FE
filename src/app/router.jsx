@@ -1,11 +1,11 @@
 import { Route, Routes } from 'react-router-dom'
 
-import App from '@/App.jsx'
+import { OverviewPage } from '@/features/overview/overview-page.jsx'
 
 export function AppRouter() {
   return (
     <Routes>
-      <Route path="/" element={<App />} />
+      <Route path="/" element={<OverviewPage />} />
     </Routes>
   )
 }
