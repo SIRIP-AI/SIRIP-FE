@@ -22,8 +22,8 @@ export const vehicleInputSchema = z.object({
   capacityKg: z.number().positive('Capacity must be greater than zero'),
   status: z.enum(vehicleStatuses),
   delayMinutes: z.number().int().nonnegative('Delay cannot be negative'),
-  restriction: z.string().trim().max(500).nullable(),
-  availableFrom: z.string().datetime().nullable(),
+  restriction: z.string().trim().max(500).nullish().transform((value) => value ?? null),
+  availableFrom: z.string().datetime().nullish().transform((value) => value ?? null),
 })
 
 export const destinationInputSchema = z.object({
