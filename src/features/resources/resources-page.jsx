@@ -12,7 +12,6 @@ import {
   destinationInputSchema,
   destinationStatuses,
   getSensorDiagnostics,
-  getSetupReadiness,
   listResources,
   listSensorAssignmentOptions,
   saveResource,
@@ -21,7 +20,7 @@ import {
   unassignSensor,
   vehicleInputSchema,
   vehicleStatuses,
-} from '@/features/setup/setup-api.js'
+} from '@/features/resources/resources-api.js'
 
 const tabs = [
   { id: 'cold-storages', label: 'Cold Storage', icon: Snowflake },
@@ -79,10 +78,7 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
   const mutation = useMutation({
     mutationFn: (input) => saveResource(type, { ...input, id: resource?.id }),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['setup', type] }),
-        queryClient.invalidateQueries({ queryKey: ['setup', 'readiness'] }),
-      ])
+      await queryClient.invalidateQueries({ queryKey: ['resources', type] })
       onComplete(resource ? 'Resource updated' : 'Resource added')
       onClose()
     },
@@ -134,7 +130,7 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
     <dialog ref={dialogRef} className="resource-dialog" aria-labelledby="resource-dialog-title" onCancel={onClose} onClick={(event) => event.target === event.currentTarget && onClose()}>
       <form className="resource-form" onSubmit={submit}>
         <div className="dialog-heading">
-          <div><span>Setup resource</span><h2 id="resource-dialog-title">{title}</h2></div>
+          <div><span>Resource</span><h2 id="resource-dialog-title">{title}</h2></div>
           <button className="dialog-close" type="button" onClick={onClose} aria-label="Close dialog">×</button>
         </div>
 
@@ -228,13 +224,13 @@ function DestinationCard({ resource, onEdit, onDelete }) {
 function AssignmentDialog({ sensor, onClose, onComplete }) {
   const queryClient = useQueryClient()
   const dialogRef = useRef(null)
-  const options = useQuery({ queryKey: ['setup', 'sensor-assignment-options'], queryFn: listSensorAssignmentOptions, enabled: !sensor.assignment })
+  const options = useQuery({ queryKey: ['resources', 'sensor-assignment-options'], queryFn: listSensorAssignmentOptions, enabled: !sensor.assignment })
   const mutation = useMutation({
     mutationFn: (batchCode) => sensor.assignment ? unassignSensor(sensor.id) : assignSensor(sensor.id, batchCode),
     onSuccess: async () => {
       await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['setup', 'sensors'] }),
-        queryClient.invalidateQueries({ queryKey: ['setup', 'sensor-assignment-options'] }),
+        queryClient.invalidateQueries({ queryKey: ['resources', 'sensors'] }),
+        queryClient.invalidateQueries({ queryKey: ['resources', 'sensor-assignment-options'] }),
       ])
       onComplete(sensor.assignment ? 'Sensor assignment ended' : 'Sensor assigned')
       onClose()
@@ -262,7 +258,7 @@ function AssignmentDialog({ sensor, onClose, onComplete }) {
 
 function DiagnosticsDialog({ sensor, onClose }) {
   const dialogRef = useRef(null)
-  const query = useQuery({ queryKey: ['setup', 'sensor-diagnostics', sensor.id], queryFn: () => getSensorDiagnostics(sensor.id) })
+  const query = useQuery({ queryKey: ['resources', 'sensor-diagnostics', sensor.id], queryFn: () => getSensorDiagnostics(sensor.id) })
   useEffect(() => dialogRef.current?.showModal(), [])
   return (
     <dialog ref={dialogRef} className="resource-dialog" aria-labelledby="diagnostics-dialog-title" onCancel={onClose} onClick={(event) => event.target === event.currentTarget && onClose()}>
@@ -296,10 +292,7 @@ function DeleteDialog({ resource, type, onClose, onComplete }) {
   const mutation = useMutation({
     mutationFn: () => deleteResource(type, resource.id),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['setup', type] }),
-        queryClient.invalidateQueries({ queryKey: ['setup', 'readiness'] }),
-      ])
+      await queryClient.invalidateQueries({ queryKey: ['resources', type] })
       onComplete('Resource deleted')
       onClose()
     },
@@ -309,7 +302,7 @@ function DeleteDialog({ resource, type, onClose, onComplete }) {
     <dialog ref={dialogRef} className="resource-dialog" aria-labelledby="delete-dialog-title" onCancel={onClose} onClick={(event) => event.target === event.currentTarget && onClose()}>
       <div className="resource-form">
         <div className="dialog-heading"><div><span>Delete resource</span><h2 id="delete-dialog-title">{name}</h2></div><button className="dialog-close" type="button" onClick={onClose} aria-label="Close dialog">×</button></div>
-        <p className="dialog-copy">This removes the resource from setup. Resources referenced by operational history cannot be deleted.</p>
+        <p className="dialog-copy">This removes the resource. Resources referenced by operational history cannot be deleted.</p>
         {mutation.isError && <p className="form-error" role="alert">{apiError(mutation.error)}</p>}
         <div className="dialog-actions"><button className="button button-secondary" type="button" onClick={onClose}>Cancel</button><button className="button button-danger" type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending}>{mutation.isPending ? 'Deleting…' : 'Delete resource'}</button></div>
       </div>
@@ -328,7 +321,7 @@ function SensorCard({ resource, onEdit, onDelete, onAssignment, onDiagnostics, o
   )
 }
 
-export function SetupPage() {
+export function ResourcesPage() {
   const [type, setType] = useState('cold-storages')
   const [dialogResource, setDialogResource] = useState(undefined)
   const [dialogOpen, setDialogOpen] = useState(false)
@@ -336,9 +329,7 @@ export function SetupPage() {
   const [deleteResourceState, setDeleteResourceState] = useState(null)
   const [notice, setNotice] = useState('')
   const noticeTimer = useRef()
-  const query = useQuery({ queryKey: ['setup', type], queryFn: () => listResources(type) })
-  const readiness = useQuery({ queryKey: ['setup', 'readiness'], queryFn: getSetupReadiness })
-  const tabByReadinessKey = { coldStorages: 'cold-storages', vehicles: 'vehicles', destinations: 'destinations' }
+  const query = useQuery({ queryKey: ['resources', type], queryFn: () => listResources(type) })
   const isColdStorage = type === 'cold-storages'
   const isVehicle = type === 'vehicles'
   const isDestination = type === 'destinations'
@@ -360,15 +351,13 @@ export function SetupPage() {
   }
 
   return (
-    <div className="dashboard setup-dashboard">
-      <div className="page-heading setup-heading">
-        <div><h1>Setup</h1><p>Configure the operational resources SIRIP is allowed to use.</p></div>
+    <div className="dashboard">
+      <div className="page-heading resources-heading">
+        <div><h1>Resources</h1><p>Manage the operational resources SIRIP is allowed to use.</p></div>
         <button className="button button-primary" type="button" onClick={() => openDialog(undefined)}><Plus size={17} />Add {resourceLabel}</button>
       </div>
 
-      {readiness.isSuccess && <section className={readiness.data.ready ? 'readiness-panel ready' : 'readiness-panel'} aria-label="Setup progress"><div className="readiness-summary"><div><span>Setup progress</span><strong>{readiness.data.ready ? 'Ready for operations' : `${readiness.data.completedSteps} of ${readiness.data.totalSteps} complete`}</strong></div><div className="readiness-meter" aria-label={`${readiness.data.completedSteps} of ${readiness.data.totalSteps} steps complete`}><span style={{ width: `${readiness.data.completedSteps / readiness.data.totalSteps * 100}%` }} /></div></div><div className="readiness-steps">{readiness.data.steps.map((step) => <button key={step.key} className={step.complete ? 'complete' : ''} type="button" onClick={() => setType(tabByReadinessKey[step.key])}><span>{step.complete ? <Check size={13} /> : step.count}</span>{step.label}</button>)}</div></section>}
-
-      <div className="setup-tabs" role="tablist" aria-label="Setup resources">
+      <div className="resources-tabs" role="tablist" aria-label="Resources">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} className={type === id ? 'active' : ''} type="button" role="tab" aria-selected={type === id} onClick={() => setType(id)}><Icon size={17} />{label}</button>)}
       </div>
 
@@ -387,7 +376,7 @@ export function SetupPage() {
         </Appear>
       )}
 
-      {notice && <div className="setup-notice" role="status"><Check size={16} />{notice}</div>}
+      {notice && <div className="resources-notice" role="status"><Check size={16} />{notice}</div>}
       {dialogOpen && <ResourceDialog type={type} resource={dialogResource} onClose={() => setDialogOpen(false)} onComplete={complete} />}
       {sensorAction?.type === 'assignment' && <AssignmentDialog sensor={sensorAction.sensor} onClose={() => setSensorAction(null)} onComplete={complete} />}
       {sensorAction?.type === 'diagnostics' && <DiagnosticsDialog sensor={sensorAction.sensor} onClose={() => setSensorAction(null)} />}

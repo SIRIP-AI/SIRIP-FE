@@ -1,11 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Boxes,
+  Blocks,
   LayoutDashboard,
   Menu,
   MessageCircle,
   Route,
-  Settings2,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
@@ -14,7 +14,7 @@ const navigation = [
   { label: 'Overview', icon: LayoutDashboard, path: '/' },
   { label: 'Batches', icon: Boxes },
   { label: 'Plan', icon: Route },
-  { label: 'Setup', icon: Settings2, path: '/setup' },
+  { label: 'Resources', icon: Blocks, path: '/resources' },
 ]
 
 function Sidebar({ isMobile, open, closeButtonRef, onClose }) {
@@ -55,7 +55,7 @@ export function AppShell() {
   const menuButtonRef = useRef(null)
   const sidebarWasOpen = useRef(false)
   const location = useLocation()
-  const title = location.pathname === '/setup' ? 'Setup' : 'Overview'
+  const title = location.pathname === '/resources' ? 'Resources' : 'Overview'
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 780px)')
