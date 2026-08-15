@@ -221,6 +221,7 @@ button, a { color: inherit; font: inherit; -webkit-tap-highlight-color: transpar
 .empty-state .button, .error-state .button { margin-top: 7px; }
 .page-error, .form-error { color: #b91c1c; border: 1px solid #fecaca; border-radius: 8px; background: #fef2f2; font-size: var(--text-small); }
 .page-error { margin: 0 0 14px; padding: 11px 13px; }
+.setup-notice { position: fixed; right: 22px; bottom: 22px; z-index: 70; display: flex; min-height: 44px; align-items: center; gap: 9px; padding: 0 16px; border: 1px solid #bbf7d0; border-radius: 9px; color: #166534; background: #f0fdf4; box-shadow: 0 12px 35px rgb(2 40 88 / 14%); font-size: var(--text-small); font-weight: 650; }
 .resource-dialog { width: 100%; max-width: none; height: 100%; max-height: none; margin: 0; padding: 0; overflow: auto; border: 0; background: transparent; }
 .resource-dialog::backdrop { background: rgb(2 40 88 / 48%); backdrop-filter: blur(3px); }
 .resource-form { display: flex; width: min(calc(100% - 32px), 560px); flex-direction: column; gap: 17px; margin: max(7vh, 28px) auto; padding: 24px; border-radius: 12px; background: white; box-shadow: 0 24px 80px rgb(2 40 88 / 24%); }

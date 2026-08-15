@@ -69,7 +69,7 @@ function localDateTime(value) {
   return date.toISOString().slice(0, 16)
 }
 
-function ResourceDialog({ type, resource, onClose }) {
+function ResourceDialog({ type, resource, onClose, onComplete }) {
   const queryClient = useQueryClient()
   const dialogRef = useRef(null)
   const [errors, setErrors] = useState({})
@@ -84,6 +84,7 @@ function ResourceDialog({ type, resource, onClose }) {
         queryClient.invalidateQueries({ queryKey: ['setup', type] }),
         queryClient.invalidateQueries({ queryKey: ['setup', 'readiness'] }),
       ])
+      onComplete(resource ? 'Resource updated' : 'Resource added')
       onClose()
     },
   })
@@ -225,7 +226,7 @@ function DestinationCard({ resource, onEdit, onDelete }) {
   )
 }
 
-function AssignmentDialog({ sensor, onClose }) {
+function AssignmentDialog({ sensor, onClose, onComplete }) {
   const queryClient = useQueryClient()
   const dialogRef = useRef(null)
   const options = useQuery({ queryKey: ['setup', 'sensor-assignment-options'], queryFn: listSensorAssignmentOptions, enabled: !sensor.assignment })
@@ -236,6 +237,7 @@ function AssignmentDialog({ sensor, onClose }) {
         queryClient.invalidateQueries({ queryKey: ['setup', 'sensors'] }),
         queryClient.invalidateQueries({ queryKey: ['setup', 'sensor-assignment-options'] }),
       ])
+      onComplete(sensor.assignment ? 'Sensor assignment ended' : 'Sensor assigned')
       onClose()
     },
   })
@@ -288,7 +290,7 @@ function BleDialog({ sensor, onClose }) {
   )
 }
 
-function DeleteDialog({ resource, type, onClose }) {
+function DeleteDialog({ resource, type, onClose, onComplete }) {
   const queryClient = useQueryClient()
   const dialogRef = useRef(null)
   const name = resource.name ?? resource.code
@@ -299,6 +301,7 @@ function DeleteDialog({ resource, type, onClose }) {
         queryClient.invalidateQueries({ queryKey: ['setup', type] }),
         queryClient.invalidateQueries({ queryKey: ['setup', 'readiness'] }),
       ])
+      onComplete('Resource deleted')
       onClose()
     },
   })
@@ -332,6 +335,8 @@ export function SetupPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [sensorAction, setSensorAction] = useState(null)
   const [deleteResourceState, setDeleteResourceState] = useState(null)
+  const [notice, setNotice] = useState('')
+  const noticeTimer = useRef()
   const query = useQuery({ queryKey: ['setup', type], queryFn: () => listResources(type) })
   const readiness = useQuery({ queryKey: ['setup', 'readiness'], queryFn: getSetupReadiness })
   const tabByReadinessKey = { coldStorages: 'cold-storages', vehicles: 'vehicles', destinations: 'destinations', sensors: 'sensors' }
@@ -339,6 +344,12 @@ export function SetupPage() {
   const isVehicle = type === 'vehicles'
   const isDestination = type === 'destinations'
   const resourceLabel = isColdStorage ? 'cold storage' : isVehicle ? 'truck' : isDestination ? 'destination' : 'sensor'
+
+  function complete(message) {
+    window.clearTimeout(noticeTimer.current)
+    setNotice(message)
+    noticeTimer.current = window.setTimeout(() => setNotice(''), 3500)
+  }
 
   function openDialog(resource) {
     setDialogResource(resource)
@@ -377,11 +388,12 @@ export function SetupPage() {
         </Appear>
       )}
 
-      {dialogOpen && <ResourceDialog type={type} resource={dialogResource} onClose={() => setDialogOpen(false)} />}
-      {sensorAction?.type === 'assignment' && <AssignmentDialog sensor={sensorAction.sensor} onClose={() => setSensorAction(null)} />}
+      {notice && <div className="setup-notice" role="status"><Check size={16} />{notice}</div>}
+      {dialogOpen && <ResourceDialog type={type} resource={dialogResource} onClose={() => setDialogOpen(false)} onComplete={complete} />}
+      {sensorAction?.type === 'assignment' && <AssignmentDialog sensor={sensorAction.sensor} onClose={() => setSensorAction(null)} onComplete={complete} />}
       {sensorAction?.type === 'diagnostics' && <DiagnosticsDialog sensor={sensorAction.sensor} onClose={() => setSensorAction(null)} />}
       {sensorAction?.type === 'ble' && <BleDialog sensor={sensorAction.sensor} onClose={() => setSensorAction(null)} />}
-      {deleteResourceState && <DeleteDialog resource={deleteResourceState.resource} type={deleteResourceState.type} onClose={() => setDeleteResourceState(null)} />}
+      {deleteResourceState && <DeleteDialog resource={deleteResourceState.resource} type={deleteResourceState.type} onClose={() => setDeleteResourceState(null)} onComplete={complete} />}
     </div>
   )
 }
