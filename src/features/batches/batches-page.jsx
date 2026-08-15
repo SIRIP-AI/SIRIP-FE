@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Boxes, Cpu, Pencil, Plus, Ship, Thermometer, Timer } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
+import { Appear } from '@/components/appear.jsx'
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
@@ -40,7 +41,7 @@ function BatchDialog({ batch, trips, onClose }) {
 }
 
 function BatchCard({ batch, onEdit }) {
-  return <article className="flex min-h-72 flex-col rounded-xl border border-border bg-card p-5">
+  return <article className="flex min-h-72 flex-col rounded-xl border border-border bg-card p-5" data-batch-card>
     <div className="flex items-start justify-between gap-4"><div><h2 className="text-base font-bold">{batch.code}</h2><p className="mt-1 text-xs text-muted-foreground">{batch.weightKg.toLocaleString()} kg · Grade {batch.grade}</p></div><StatusBadge tone={statusTones[batch.status]}>{statusLabels[batch.status]}</StatusBadge></div>
     <div className="mt-5 grid grid-cols-2 divide-x divide-border border-y border-border py-4"><Metric icon={Thermometer} label="Temperature" value={measurement(batch.currentTemperatureC, '°C')} /><Metric icon={Timer} label="Quality remaining" value={measurement(batch.remainingQualityWindowDays, ' days')} /></div>
     <dl className="mt-4 grid gap-2.5 text-xs"><Fact icon={Ship} label="Origin" value={`${batch.fishingTrip.code} · ${batch.fishingTrip.vesselName}`} /><Fact icon={Cpu} label="Sensor" value={batch.activeSensor?.code ?? 'Unassigned'} /></dl>
@@ -58,7 +59,7 @@ export function BatchesPage() {
   return <div className="mx-auto w-full max-w-[1180px] px-8 pt-12 pb-7 max-[780px]:px-4 max-[780px]:py-6">
     <header className="mb-6 flex items-center justify-between gap-4"><div><h1 className="text-3xl font-bold tracking-[-.04em] max-[780px]:sr-only">Batches</h1><Link className="mt-2 block text-sm text-primary hover:underline max-[780px]:mt-0" to="/fishing-trips">Fishing trips</Link></div><Button onClick={() => setEditing(null)} disabled={!trips.data?.length}><Plus />Receive batch</Button></header>
     {query.isPending && <State>Loading batches…</State>}{query.isError && <State error>{apiError(query.error)}</State>}{query.isSuccess && !query.data.length && <State>No batches</State>}
-    {query.isSuccess && query.data.length > 0 && <div className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3.5">{query.data.map((batch) => <BatchCard key={batch.id} batch={batch} onEdit={() => setEditing(batch)} />)}</div>}
+    {query.isSuccess && query.data.length > 0 && <Appear className="grid grid-cols-[repeat(auto-fit,minmax(300px,1fr))] gap-3.5" stagger="[data-batch-card]">{query.data.map((batch) => <BatchCard key={batch.id} batch={batch} onEdit={() => setEditing(batch)} />)}</Appear>}
     {trips.isSuccess && !trips.data.length && <p className="mt-4 text-xs text-muted-foreground">Add a fishing trip before receiving a batch.</p>}
     {editing !== undefined && trips.data?.length > 0 && <BatchDialog batch={editing} trips={trips.data} onClose={() => setEditing(undefined)} />}
   </div>

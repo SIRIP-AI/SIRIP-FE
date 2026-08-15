@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Anchor, Check, Clock3, Pencil, Plus, Ship, Boxes } from 'lucide-react'
 
+import { Appear } from '@/components/appear.jsx'
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
@@ -46,7 +47,7 @@ function CompleteDialog({ trip, onClose }) {
 }
 
 function TripCard({ trip, onEdit, onComplete }) {
-  return <article className="flex min-h-64 flex-col rounded-xl border border-border bg-card p-5">
+  return <article className="flex min-h-64 flex-col rounded-xl border border-border bg-card p-5" data-trip-card>
     <div className="flex items-start justify-between gap-4"><div className="flex min-w-0 items-center gap-3"><span className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary"><Ship size={19} /></span><div className="min-w-0"><h2 className="truncate text-base font-bold">{trip.code}</h2><p className="mt-1 truncate text-xs text-muted-foreground">{trip.vesselName}</p></div></div><StatusBadge tone={trip.status === 'ACTIVE' ? 'healthy' : 'neutral'}>{trip.status === 'ACTIVE' ? 'Active' : 'Completed'}</StatusBadge></div>
     <dl className="mt-5 divide-y divide-border border-y border-border">
       <Fact icon={Clock3} label="Started" value={dateTime(trip.startedAt)} />
@@ -68,7 +69,7 @@ export function FishingTripsPage() {
   return <div className="mx-auto w-full max-w-[1180px] px-8 pt-12 pb-7 max-[780px]:px-4 max-[780px]:py-6">
     <header className="mb-6 flex items-center justify-between gap-4"><h1 className="text-3xl font-bold tracking-[-.04em] max-[780px]:sr-only">Fishing trips</h1><Button onClick={() => setEditing(null)}><Plus />Add trip</Button></header>
     {query.isPending && <State>Loading fishing trips…</State>}{query.isError && <State error>{apiError(query.error)}</State>}{query.isSuccess && !query.data.length && <State>No fishing trips</State>}
-    {query.isSuccess && query.data.length > 0 && <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3.5">{query.data.map((trip) => <TripCard key={trip.id} trip={trip} onEdit={() => setEditing(trip)} onComplete={() => setCompleting(trip)} />)}</div>}
+    {query.isSuccess && query.data.length > 0 && <Appear className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3.5" stagger="[data-trip-card]">{query.data.map((trip) => <TripCard key={trip.id} trip={trip} onEdit={() => setEditing(trip)} onComplete={() => setCompleting(trip)} />)}</Appear>}
     {editing !== undefined && <TripDialog trip={editing} onClose={() => setEditing(undefined)} />}{completing && <CompleteDialog trip={completing} onClose={() => setCompleting(null)} />}
   </div>
 }
