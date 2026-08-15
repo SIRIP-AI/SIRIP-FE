@@ -3,7 +3,6 @@ import {
   Boxes,
   Ship,
   Blocks,
-  LayoutDashboard,
   Menu,
   MessageCircle,
   Route,
@@ -15,11 +14,10 @@ import { Button } from '@/components/ui/button.jsx'
 import { cn } from '@/lib/utils.js'
 
 const navigation = [
-  { label: 'Overview', icon: LayoutDashboard, path: '/' },
-  { label: 'Batches', icon: Boxes, path: '/batches' },
-  { label: 'Fishing Trips', icon: Ship, path: '/fishing-trips' },
-  { label: 'Plans', icon: Route, path: '/plans' },
   { label: 'Resources', icon: Blocks, path: '/resources' },
+  { label: 'Fishing Trips', icon: Ship, path: '/fishing-trips' },
+  { label: 'Batches', icon: Boxes, path: '/batches' },
+  { label: 'Plans', icon: Route, path: '/plans' },
 ]
 
 function Sidebar({ isMobile, open, closeButtonRef, onClose }) {
@@ -60,7 +58,7 @@ export function AppShell() {
   const menuButtonRef = useRef(null)
   const sidebarWasOpen = useRef(false)
   const location = useLocation()
-  const title = location.pathname === '/resources' ? 'Resources' : location.pathname === '/batches' ? 'Batches' : location.pathname === '/fishing-trips' ? 'Fishing Trips' : location.pathname === '/plans' ? 'Plans' : 'Overview'
+  const title = location.pathname === '/resources' ? 'Resources' : location.pathname === '/fishing-trips' ? 'Fishing Trips' : location.pathname === '/batches' ? 'Batches' : location.pathname === '/plans' ? 'Plans' : 'SIRIP'
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 780px)')

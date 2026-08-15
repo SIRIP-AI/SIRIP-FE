@@ -3,6 +3,7 @@ import { ArrowLeft, Check, CheckCircle2, ChevronRight, Clock3, MapPin, Plus, Rou
 
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Appear } from '@/components/appear.jsx'
+import { PageHeader } from '@/components/page-header.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
 import { cn } from '@/lib/utils.js'
@@ -89,7 +90,7 @@ export function PlansPage() {
   const [proposals, setProposals] = useState([])
   function create(plan) { setProposals((current) => [plan, ...current]); setCreating(false) }
   return <div className="mx-auto w-full max-w-[1180px] px-8 pt-12 pb-7 max-[780px]:px-4 max-[780px]:py-6">
-    <header className="mb-6 flex items-center justify-between gap-4"><h1 className="text-3xl font-bold tracking-[-.04em] max-[780px]:sr-only">Plans</h1><Button onClick={() => setCreating(true)} disabled={creating}><Plus />Create new plan</Button></header>
+    <PageHeader title="Plans" description="Review the active operation plan and pending proposals." action={<Button onClick={() => setCreating(true)} disabled={creating}><Plus />Create new plan</Button>} />
     <div className="grid gap-7">{creating && <Builder nextVersion={4 + proposals.length} onCancel={() => setCreating(false)} onCreate={create} />}<div><h2 className="mb-3 text-sm font-bold">Active plan</h2><ActivePlan /></div><Appear delay={0.12}><div className="mb-3 flex items-center justify-between"><h2 className="text-sm font-bold">Proposed plans</h2><span className="text-xs text-muted-foreground">{proposals.length}</span></div>{proposals.length ? <div className="grid grid-cols-[repeat(auto-fit,minmax(280px,1fr))] gap-3.5">{proposals.map((plan) => <ProposedPlan key={plan.version} plan={plan} />)}</div> : <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground"><Ship className="mr-2" size={17} />No proposed plans</div>}</Appear></div>
   </div>
 }
