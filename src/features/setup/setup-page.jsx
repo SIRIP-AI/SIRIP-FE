@@ -77,6 +77,7 @@ function ResourceDialog({ type, resource, onClose }) {
       capacityKg: Number(form.get('capacityKg')),
       status: form.get('status'),
       delayMinutes: Number(form.get('delayMinutes')),
+      restriction: form.get('restriction')?.trim() || null,
       availableFrom: form.get('availableFrom') ? new Date(form.get('availableFrom')).toISOString() : null,
     }
     const result = (isColdStorage ? coldStorageInputSchema : vehicleInputSchema).safeParse(input)
@@ -112,6 +113,7 @@ function ResourceDialog({ type, resource, onClose }) {
               <label>Capacity (kg)<input name="capacityKg" type="number" min="0.01" step="0.01" defaultValue={resource?.capacityKg ?? ''} aria-invalid={Boolean(errors.capacityKg)} />{errors.capacityKg && <span>{errors.capacityKg}</span>}</label>
               <label>Delay (minutes)<input name="delayMinutes" type="number" min="0" step="1" defaultValue={resource?.delayMinutes ?? 0} aria-invalid={Boolean(errors.delayMinutes)} />{errors.delayMinutes && <span>{errors.delayMinutes}</span>}</label>
             </div>
+            <label>Restriction<textarea name="restriction" defaultValue={resource?.restriction ?? ''} placeholder="Road, loading, or operational restriction" maxLength="500" aria-invalid={Boolean(errors.restriction)} />{errors.restriction && <span>{errors.restriction}</span>}</label>
             <label>Available from<input name="availableFrom" type="datetime-local" defaultValue={localDateTime(resource?.availableFrom)} aria-invalid={Boolean(errors.availableFrom)} />{errors.availableFrom && <span>{errors.availableFrom}</span>}</label>
             <label>Status<select name="status" defaultValue={resource?.status ?? 'AVAILABLE'}>{vehicleStatuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select></label>
           </>
@@ -145,7 +147,7 @@ function VehicleCard({ resource, onEdit, onDelete, deleting }) {
     <article className="resource-card">
       <div className="resource-card-heading"><div className="resource-icon"><Truck size={20} /></div><StatusBadge status={resource.status} /></div>
       <div><h3>{resource.code}</h3><p>{resource.capacityKg.toLocaleString()} kg load capacity</p></div>
-      <div className="vehicle-detail"><Clock3 size={16} /><span>{resource.delayMinutes ? `${resource.delayMinutes} minute delay` : resource.availableFrom ? `Available ${new Date(resource.availableFrom).toLocaleString()}` : 'No known delay or restriction'}</span></div>
+      <div className="vehicle-detail"><Clock3 size={16} /><span>{resource.restriction ?? (resource.delayMinutes ? `${resource.delayMinutes} minute delay` : resource.availableFrom ? `Available ${new Date(resource.availableFrom).toLocaleString()}` : 'No known delay or restriction')}</span></div>
       <div className="resource-actions"><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete} disabled={deleting}><Trash2 size={15} />Delete</button></div>
     </article>
   )
