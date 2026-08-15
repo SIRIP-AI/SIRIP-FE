@@ -27,7 +27,6 @@ const tabs = [
   { id: 'cold-storages', label: 'Cold Storage', icon: Snowflake },
   { id: 'vehicles', label: 'Trucks', icon: Truck },
   { id: 'destinations', label: 'Destinations', icon: MapPin },
-  { id: 'sensors', label: 'Sensors', icon: Cpu },
 ]
 
 const labels = {
@@ -339,7 +338,7 @@ export function SetupPage() {
   const noticeTimer = useRef()
   const query = useQuery({ queryKey: ['setup', type], queryFn: () => listResources(type) })
   const readiness = useQuery({ queryKey: ['setup', 'readiness'], queryFn: getSetupReadiness })
-  const tabByReadinessKey = { coldStorages: 'cold-storages', vehicles: 'vehicles', destinations: 'destinations', sensors: 'sensors' }
+  const tabByReadinessKey = { coldStorages: 'cold-storages', vehicles: 'vehicles', destinations: 'destinations' }
   const isColdStorage = type === 'cold-storages'
   const isVehicle = type === 'vehicles'
   const isDestination = type === 'destinations'
