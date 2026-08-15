@@ -153,6 +153,8 @@ button, a { color: inherit; font: inherit; -webkit-tap-highlight-color: transpar
 .button-primary:hover { background: #011d41; }
 .button-secondary { color: var(--primary); border: 1px solid var(--border); background: white; }
 .button-secondary:hover { background: #f8fafc; }
+.button-danger { color: white; background: var(--red); }
+.button-danger:hover { background: #b91c1c; }
 .quality-disclaimer { margin: 16px 0 0; color: var(--subtle); font-size: 11px; }
 .sidebar-backdrop { display: none; }
 

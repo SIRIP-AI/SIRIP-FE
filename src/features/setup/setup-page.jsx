@@ -189,7 +189,7 @@ function ResourceDialog({ type, resource, onClose }) {
   )
 }
 
-function ColdStorageCard({ resource, onEdit, onDelete, deleting }) {
+function ColdStorageCard({ resource, onEdit, onDelete }) {
   const usedPercent = Math.round((1 - resource.availableCapacityKg / resource.capacityKg) * 100)
   return (
     <article className="resource-card">
@@ -197,30 +197,30 @@ function ColdStorageCard({ resource, onEdit, onDelete, deleting }) {
       <div><h3>{resource.name}</h3><p>{resource.capacityKg.toLocaleString()} kg total capacity</p></div>
       <div className="capacity-row"><strong>{resource.availableCapacityKg.toLocaleString()} kg</strong><span>available</span></div>
       <div className="capacity-track" aria-label={`${usedPercent}% capacity used`}><span style={{ width: `${usedPercent}%` }} /></div>
-      <div className="resource-actions"><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete} disabled={deleting}><Trash2 size={15} />Delete</button></div>
+      <div className="resource-actions"><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete}><Trash2 size={15} />Delete</button></div>
     </article>
   )
 }
 
-function VehicleCard({ resource, onEdit, onDelete, deleting }) {
+function VehicleCard({ resource, onEdit, onDelete }) {
   return (
     <article className="resource-card">
       <div className="resource-card-heading"><div className="resource-icon"><Truck size={20} /></div><StatusBadge status={resource.status} /></div>
       <div><h3>{resource.code}</h3><p>{resource.capacityKg.toLocaleString()} kg load capacity</p></div>
       <div className="vehicle-detail"><Clock3 size={16} /><span>{resource.restriction ?? (resource.delayMinutes ? `${resource.delayMinutes} minute delay` : resource.availableFrom ? `Available ${new Date(resource.availableFrom).toLocaleString()}` : 'No known delay or restriction')}</span></div>
-      <div className="resource-actions"><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete} disabled={deleting}><Trash2 size={15} />Delete</button></div>
+      <div className="resource-actions"><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete}><Trash2 size={15} />Delete</button></div>
     </article>
   )
 }
 
-function DestinationCard({ resource, onEdit, onDelete, deleting }) {
+function DestinationCard({ resource, onEdit, onDelete }) {
   return (
     <article className="resource-card">
       <div className="resource-card-heading"><div className="resource-icon"><MapPin size={20} /></div><StatusBadge status={resource.status} /></div>
       <div><h3>{resource.name}</h3><p>{resource.address}</p></div>
       <div className="destination-details"><span><strong>{resource.travelMinutes} min</strong> travel</span><span><strong>{resource.receivingStart}–{resource.receivingEnd}</strong> receiving</span></div>
       {resource.notes && <p className="resource-note">{resource.notes}</p>}
-      <div className="resource-actions"><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete} disabled={deleting}><Trash2 size={15} />Delete</button></div>
+      <div className="resource-actions"><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete}><Trash2 size={15} />Delete</button></div>
     </article>
   )
 }
@@ -288,38 +288,57 @@ function BleDialog({ sensor, onClose }) {
   )
 }
 
-function SensorCard({ resource, onEdit, onDelete, onAssignment, onDiagnostics, onBleSync, deleting }) {
+function DeleteDialog({ resource, type, onClose }) {
+  const queryClient = useQueryClient()
+  const dialogRef = useRef(null)
+  const name = resource.name ?? resource.code
+  const mutation = useMutation({
+    mutationFn: () => deleteResource(type, resource.id),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['setup', type] }),
+        queryClient.invalidateQueries({ queryKey: ['setup', 'readiness'] }),
+      ])
+      onClose()
+    },
+  })
+  useEffect(() => dialogRef.current?.showModal(), [])
+  return (
+    <dialog ref={dialogRef} className="resource-dialog" aria-labelledby="delete-dialog-title" onCancel={onClose} onClick={(event) => event.target === event.currentTarget && onClose()}>
+      <div className="resource-form">
+        <div className="dialog-heading"><div><span>Delete resource</span><h2 id="delete-dialog-title">{name}</h2></div><button className="dialog-close" type="button" onClick={onClose} aria-label="Close dialog">×</button></div>
+        <p className="dialog-copy">This removes the resource from setup. Resources referenced by operational history cannot be deleted.</p>
+        {mutation.isError && <p className="form-error" role="alert">{apiError(mutation.error)}</p>}
+        <div className="dialog-actions"><button className="button button-secondary" type="button" onClick={onClose}>Cancel</button><button className="button button-danger" type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending}>{mutation.isPending ? 'Deleting…' : 'Delete resource'}</button></div>
+      </div>
+    </dialog>
+  )
+}
+
+function SensorCard({ resource, onEdit, onDelete, onAssignment, onDiagnostics, onBleSync }) {
   return (
     <article className="resource-card sensor-card">
       <div className="resource-card-heading"><div className="resource-icon"><Cpu size={20} /></div><StatusBadge status={resource.connectivityStatus} /></div>
       <div><h3>{resource.code}</h3><p>{resource.deviceUid}</p></div>
       <div className="sensor-meta"><span><strong>{labels[resource.provisioningStatus]}</strong> provisioning</span><span><strong>{resource.assignment?.batchCode ?? 'Unassigned'}</strong> assignment</span><span><strong>{resource.lastSeenAt ? new Date(resource.lastSeenAt).toLocaleString() : 'Never'}</strong> last seen</span></div>
-      <div className="resource-actions sensor-actions"><button type="button" onClick={onAssignment}><Unplug size={15} />{resource.assignment ? 'Unassign' : 'Assign'}</button><button type="button" onClick={onDiagnostics}><Activity size={15} />Diagnostics</button><button type="button" onClick={onBleSync}><Bluetooth size={15} />BLE sync</button><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete} disabled={deleting}><Trash2 size={15} />Delete</button></div>
+      <div className="resource-actions sensor-actions"><button type="button" onClick={onAssignment}><Unplug size={15} />{resource.assignment ? 'Unassign' : 'Assign'}</button><button type="button" onClick={onDiagnostics}><Activity size={15} />Diagnostics</button><button type="button" onClick={onBleSync}><Bluetooth size={15} />BLE sync</button><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete}><Trash2 size={15} />Delete</button></div>
     </article>
   )
 }
 
 export function SetupPage() {
-  const queryClient = useQueryClient()
   const [type, setType] = useState('cold-storages')
   const [dialogResource, setDialogResource] = useState(undefined)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [sensorAction, setSensorAction] = useState(null)
+  const [deleteResourceState, setDeleteResourceState] = useState(null)
   const query = useQuery({ queryKey: ['setup', type], queryFn: () => listResources(type) })
   const readiness = useQuery({ queryKey: ['setup', 'readiness'], queryFn: getSetupReadiness })
-  const deletion = useMutation({
-    mutationFn: ({ resourceType, id }) => deleteResource(resourceType, id),
-    onSuccess: async (_, variables) => Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['setup', variables.resourceType] }),
-      queryClient.invalidateQueries({ queryKey: ['setup', 'readiness'] }),
-    ]),
-  })
   const tabByReadinessKey = { coldStorages: 'cold-storages', vehicles: 'vehicles', destinations: 'destinations', sensors: 'sensors' }
   const isColdStorage = type === 'cold-storages'
   const isVehicle = type === 'vehicles'
   const isDestination = type === 'destinations'
   const resourceLabel = isColdStorage ? 'cold storage' : isVehicle ? 'truck' : isDestination ? 'destination' : 'sensor'
-  const resourceName = (resource) => resource.name ?? resource.code
 
   function openDialog(resource) {
     setDialogResource(resource)
@@ -327,9 +346,7 @@ export function SetupPage() {
   }
 
   function remove(resource) {
-    if (window.confirm(`Delete ${resourceName(resource)}?`)) {
-      deletion.mutate({ resourceType: type, id: resource.id })
-    }
+    setDeleteResourceState({ resource, type })
   }
 
   return (
@@ -345,19 +362,18 @@ export function SetupPage() {
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} className={type === id ? 'active' : ''} type="button" role="tab" aria-selected={type === id} onClick={() => setType(id)}><Icon size={17} />{label}</button>)}
       </div>
 
-      {deletion.isError && <p className="page-error" role="alert">{apiError(deletion.error)}</p>}
       {query.isPending && <div className="resource-state">Loading resources…</div>}
       {query.isError && <div className="resource-state error-state"><strong>Could not load resources</strong><span>{apiError(query.error)}</span><button className="button button-secondary" type="button" onClick={() => query.refetch()}>Try again</button></div>}
       {query.isSuccess && !query.data.length && <div className="resource-state empty-state"><div className="resource-icon">{isColdStorage ? <Snowflake size={22} /> : isVehicle ? <Truck size={22} /> : isDestination ? <MapPin size={22} /> : <Cpu size={22} />}</div><strong>No {resourceLabel} configured</strong><span>Add every resource your operation can use.</span><button className="button button-primary" type="button" onClick={() => openDialog(undefined)}><Plus size={17} />Add first resource</button></div>}
       {query.isSuccess && query.data.length > 0 && (
         <Appear className="resource-grid" key={type}>
           {query.data.map((resource) => isColdStorage
-            ? <ColdStorageCard key={resource.id} resource={resource} onEdit={() => openDialog(resource)} onDelete={() => remove(resource)} deleting={deletion.isPending} />
+            ? <ColdStorageCard key={resource.id} resource={resource} onEdit={() => openDialog(resource)} onDelete={() => remove(resource)} />
             : isVehicle
-              ? <VehicleCard key={resource.id} resource={resource} onEdit={() => openDialog(resource)} onDelete={() => remove(resource)} deleting={deletion.isPending} />
+              ? <VehicleCard key={resource.id} resource={resource} onEdit={() => openDialog(resource)} onDelete={() => remove(resource)} />
               : isDestination
-                ? <DestinationCard key={resource.id} resource={resource} onEdit={() => openDialog(resource)} onDelete={() => remove(resource)} deleting={deletion.isPending} />
-                : <SensorCard key={resource.id} resource={resource} onEdit={() => openDialog(resource)} onDelete={() => remove(resource)} onAssignment={() => setSensorAction({ type: 'assignment', sensor: resource })} onDiagnostics={() => setSensorAction({ type: 'diagnostics', sensor: resource })} onBleSync={() => setSensorAction({ type: 'ble', sensor: resource })} deleting={deletion.isPending} />)}
+                ? <DestinationCard key={resource.id} resource={resource} onEdit={() => openDialog(resource)} onDelete={() => remove(resource)} />
+                : <SensorCard key={resource.id} resource={resource} onEdit={() => openDialog(resource)} onDelete={() => remove(resource)} onAssignment={() => setSensorAction({ type: 'assignment', sensor: resource })} onDiagnostics={() => setSensorAction({ type: 'diagnostics', sensor: resource })} onBleSync={() => setSensorAction({ type: 'ble', sensor: resource })} />)}
         </Appear>
       )}
 
@@ -365,6 +381,7 @@ export function SetupPage() {
       {sensorAction?.type === 'assignment' && <AssignmentDialog sensor={sensorAction.sensor} onClose={() => setSensorAction(null)} />}
       {sensorAction?.type === 'diagnostics' && <DiagnosticsDialog sensor={sensorAction.sensor} onClose={() => setSensorAction(null)} />}
       {sensorAction?.type === 'ble' && <BleDialog sensor={sensorAction.sensor} onClose={() => setSensorAction(null)} />}
+      {deleteResourceState && <DeleteDialog resource={deleteResourceState.resource} type={deleteResourceState.type} onClose={() => setDeleteResourceState(null)} />}
     </div>
   )
 }
