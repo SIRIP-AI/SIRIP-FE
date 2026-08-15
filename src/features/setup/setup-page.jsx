@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Activity, Bluetooth, Clock3, Cpu, MapPin, Pencil, Plus, Snowflake, Trash2, Truck, Unplug } from 'lucide-react'
+import { Activity, Bluetooth, Check, Clock3, Cpu, MapPin, Pencil, Plus, Snowflake, Trash2, Truck, Unplug } from 'lucide-react'
 
 import { Appear } from '@/components/appear.jsx'
 import {
@@ -12,6 +12,7 @@ import {
   destinationInputSchema,
   destinationStatuses,
   getSensorDiagnostics,
+  getSetupReadiness,
   listResources,
   listSensorAssignmentOptions,
   saveResource,
@@ -79,7 +80,10 @@ function ResourceDialog({ type, resource, onClose }) {
   const mutation = useMutation({
     mutationFn: (input) => saveResource(type, { ...input, id: resource?.id }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['setup', type] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['setup', type] }),
+        queryClient.invalidateQueries({ queryKey: ['setup', 'readiness'] }),
+      ])
       onClose()
     },
   })
@@ -302,10 +306,15 @@ export function SetupPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [sensorAction, setSensorAction] = useState(null)
   const query = useQuery({ queryKey: ['setup', type], queryFn: () => listResources(type) })
+  const readiness = useQuery({ queryKey: ['setup', 'readiness'], queryFn: getSetupReadiness })
   const deletion = useMutation({
     mutationFn: ({ resourceType, id }) => deleteResource(resourceType, id),
-    onSuccess: (_, variables) => queryClient.invalidateQueries({ queryKey: ['setup', variables.resourceType] }),
+    onSuccess: async (_, variables) => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['setup', variables.resourceType] }),
+      queryClient.invalidateQueries({ queryKey: ['setup', 'readiness'] }),
+    ]),
   })
+  const tabByReadinessKey = { coldStorages: 'cold-storages', vehicles: 'vehicles', destinations: 'destinations', sensors: 'sensors' }
   const isColdStorage = type === 'cold-storages'
   const isVehicle = type === 'vehicles'
   const isDestination = type === 'destinations'
@@ -329,6 +338,8 @@ export function SetupPage() {
         <div><h1>Setup</h1><p>Configure the operational resources SIRIP is allowed to use.</p></div>
         <button className="button button-primary" type="button" onClick={() => openDialog(undefined)}><Plus size={17} />Add {resourceLabel}</button>
       </div>
+
+      {readiness.isSuccess && <section className={readiness.data.ready ? 'readiness-panel ready' : 'readiness-panel'} aria-label="Setup progress"><div className="readiness-summary"><div><span>Setup progress</span><strong>{readiness.data.ready ? 'Ready for operations' : `${readiness.data.completedSteps} of ${readiness.data.totalSteps} complete`}</strong></div><div className="readiness-meter" aria-label={`${readiness.data.completedSteps} of ${readiness.data.totalSteps} steps complete`}><span style={{ width: `${readiness.data.completedSteps / readiness.data.totalSteps * 100}%` }} /></div></div><div className="readiness-steps">{readiness.data.steps.map((step) => <button key={step.key} className={step.complete ? 'complete' : ''} type="button" onClick={() => setType(tabByReadinessKey[step.key])}><span>{step.complete ? <Check size={13} /> : step.count}</span>{step.label}</button>)}</div></section>}
 
       <div className="setup-tabs" role="tablist" aria-label="Setup resources">
         {tabs.map(({ id, label, icon: Icon }) => <button key={id} className={type === id ? 'active' : ''} type="button" role="tab" aria-selected={type === id} onClick={() => setType(id)}><Icon size={17} />{label}</button>)}
