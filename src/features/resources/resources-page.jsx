@@ -1,10 +1,10 @@
-import { Children, cloneElement, isValidElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { Children, cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import gsap from 'gsap'
 import { Activity, Bluetooth, Check, Clock3, Cpu, MapPin, Pencil, Plus, Snowflake, Trash2, Truck, Unplug } from 'lucide-react'
 
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Appear } from '@/components/appear.jsx'
+import { PageHeader } from '@/components/page-header.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Dialog, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
 import { DialogContent } from '@/components/ui/dialog.jsx'
@@ -69,21 +69,7 @@ function ResourceStatusBadge({ status }) {
   return <StatusBadge tone={tones[status] ?? 'neutral'}>{labels[status] ?? status}</StatusBadge>
 }
 
-function AnimatedDialogContent({ className, children, ...props }) {
-  const contentRef = useRef(null)
-
-  useLayoutEffect(() => {
-    const element = contentRef.current
-    if (!element) return
-    const media = gsap.matchMedia()
-    media.add('(prefers-reduced-motion: no-preference)', () => {
-      gsap.fromTo(element, { autoAlpha: 0, y: 8, scale: 0.99 }, { autoAlpha: 1, y: 0, scale: 1, duration: 0.22, ease: 'power2.out', clearProps: 'opacity,visibility,transform' })
-    }, element)
-    return () => media.revert()
-  }, [])
-
-  return <DialogContent ref={contentRef} className={cn('max-h-[calc(100vh-2rem)] max-w-[560px] overflow-y-auto p-6 shadow-[0_24px_80px_rgb(2_40_88_/_24%)] sm:p-6', className)} {...props}>{children}</DialogContent>
-}
+function ResourceDialogContent({ className = '', children, ...props }) { return <DialogContent className={`max-h-[calc(100vh-2rem)] max-w-[560px] overflow-y-auto p-6 shadow-[0_24px_80px_rgb(2_40_88_/_24%)] sm:p-6 ${className}`} {...props}>{children}</DialogContent> }
 
 function DialogHeading({ eyebrow, title }) {
   return <DialogHeader className="pr-10"><span className="text-[10px] font-bold tracking-[.08em] text-primary uppercase">{eyebrow}</span><DialogTitle className="text-[21px] font-bold tracking-[-.03em]">{title}</DialogTitle></DialogHeader>
@@ -165,7 +151,7 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <AnimatedDialogContent>
+      <ResourceDialogContent>
         <form className="grid gap-4" onSubmit={submit}>
         <DialogHeading eyebrow="Resource" title={title} />
         <DialogDescription className="sr-only">Configure the selected operational resource.</DialogDescription>
@@ -214,12 +200,12 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
         {mutation.isError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">{apiError(mutation.error)}</p>}
         <DialogFooter className="mt-1 -mx-6 -mb-6 p-4 sm:px-6"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Saving…' : 'Save resource'}</Button></DialogFooter>
         </form>
-      </AnimatedDialogContent>
+      </ResourceDialogContent>
     </Dialog>
   )
 }
 
-const cardClass = 'flex min-h-64 flex-col gap-5 rounded-xl border border-border bg-card p-5 shadow-[0_1px_2px_rgb(2_40_88_/_3%)]'
+const cardClass = 'flex flex-col gap-4 rounded-xl border border-border bg-card p-5 shadow-[0_1px_2px_rgb(2_40_88_/_3%)]'
 
 function ResourceIcon({ children }) {
   return <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-primary/10 text-primary">{children}</div>
@@ -290,7 +276,7 @@ function AssignmentDialog({ sensor, onClose, onComplete }) {
 
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <AnimatedDialogContent>
+      <ResourceDialogContent>
       <form className="grid gap-4" onSubmit={submit}>
         <DialogHeading eyebrow="Sensor assignment" title={sensor.code} />
         <DialogDescription className="sr-only">Assign this sensor to an active unmonitored batch.</DialogDescription>
@@ -298,7 +284,7 @@ function AssignmentDialog({ sensor, onClose, onComplete }) {
         {mutation.isError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">{apiError(mutation.error)}</p>}
         <DialogFooter className="mt-1 -mx-6 -mb-6 p-4 sm:px-6"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button type="submit" disabled={mutation.isPending || (!sensor.assignment && !options.data?.length)}>{mutation.isPending ? 'Saving…' : sensor.assignment ? 'End assignment' : 'Assign sensor'}</Button></DialogFooter>
       </form>
-      </AnimatedDialogContent>
+      </ResourceDialogContent>
     </Dialog>
   )
 }
@@ -307,12 +293,12 @@ function DiagnosticsDialog({ sensor, onClose }) {
   const query = useQuery({ queryKey: ['resources', 'sensor-diagnostics', sensor.id], queryFn: () => getSensorDiagnostics(sensor.id) })
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <AnimatedDialogContent className="grid gap-4">
+      <ResourceDialogContent className="grid gap-4">
         <DialogHeading eyebrow="Diagnostics" title={sensor.code} />
         <DialogDescription className="sr-only">Latest sensor connectivity, session, synchronization, and temperature details.</DialogDescription>
         {query.isPending ? <p className="text-sm text-muted-foreground" role="status">Loading diagnostics…</p> : query.isError ? <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">{apiError(query.error)}</p> : <dl className="grid grid-cols-2 gap-2">{[['Connectivity', <ResourceStatusBadge key="status" status={query.data.sensor.connectivityStatus} />], ['Last communication', query.data.sensor.lastSeenAt ? new Date(query.data.sensor.lastSeenAt).toLocaleString() : 'Never'], ['Session', query.data.sessionStatus ?? 'None'], ['Last sync', query.data.lastSyncedAt ? new Date(query.data.lastSyncedAt).toLocaleString() : 'Never'], ['Latest temperature', query.data.latestReading ? `${query.data.latestReading.temperatureC}°C` : 'No readings received']].map(([label, value], index) => <div className={cn('flex min-h-18 flex-col items-start justify-center gap-2 rounded-lg border p-3', index === 4 && 'col-span-2')} key={label}><dt className="text-[10px] text-muted-foreground">{label}</dt><dd className="text-xs font-semibold">{value}</dd></div>)}</dl>}
         <DialogFooter className="mt-1 -mx-6 -mb-6 p-4 sm:px-6"><Button type="button" onClick={onClose}>Done</Button></DialogFooter>
-      </AnimatedDialogContent>
+      </ResourceDialogContent>
     </Dialog>
   )
 }
@@ -320,12 +306,12 @@ function DiagnosticsDialog({ sensor, onClose }) {
 function BleDialog({ sensor, onClose }) {
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <AnimatedDialogContent className="grid gap-4">
+      <ResourceDialogContent className="grid gap-4">
         <DialogHeading eyebrow="Manual BLE sync" title={sensor.code} />
         <DialogDescription className="sr-only">Guidance for manually synchronizing this sensor over Bluetooth.</DialogDescription>
         <div className="flex gap-3 rounded-lg bg-blue-50 p-3 text-xs leading-relaxed text-slate-600"><Bluetooth className="shrink-0 text-primary" size={24} /><div><strong className="text-foreground">Device connection required</strong><p className="mt-1">Bring this browser device near the ESP32. Manual sync will be enabled when the firmware BLE service and secure pairing protocol are available.</p></div></div>
         <DialogFooter className="mt-1 -mx-6 -mb-6 p-4 sm:px-6"><Button type="button" onClick={onClose}>Done</Button></DialogFooter>
-      </AnimatedDialogContent>
+      </ResourceDialogContent>
     </Dialog>
   )
 }
@@ -343,12 +329,12 @@ function DeleteDialog({ resource, type, onClose, onComplete }) {
   })
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <AnimatedDialogContent className="grid gap-4">
+      <ResourceDialogContent className="grid gap-4">
         <DialogHeading eyebrow="Delete resource" title={name} />
         <DialogDescription className="text-sm leading-relaxed text-slate-600">This removes the resource. Resources referenced by operational history cannot be deleted.</DialogDescription>
         {mutation.isError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">{apiError(mutation.error)}</p>}
         <DialogFooter className="mt-1 -mx-6 -mb-6 p-4 sm:px-6"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button variant="destructive" type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending}>{mutation.isPending ? 'Deleting…' : 'Delete resource'}</Button></DialogFooter>
-      </AnimatedDialogContent>
+      </ResourceDialogContent>
     </Dialog>
   )
 }
@@ -359,7 +345,8 @@ function SensorCard({ resource, onEdit, onDelete, onAssignment, onDiagnostics, o
       <div className="flex items-center justify-between gap-3"><ResourceIcon><Cpu size={20} /></ResourceIcon><ResourceStatusBadge status={resource.connectivityStatus} /></div>
       <div><h3 className="text-lg font-bold tracking-[-.025em]">{resource.code}</h3><p className="mt-1.5 text-xs text-muted-foreground">{resource.deviceUid}</p></div>
       <dl className="grid gap-2 rounded-lg bg-muted/60 p-3">{[['Provisioning', labels[resource.provisioningStatus]], ['Assignment', resource.assignment?.batchCode ?? 'Unassigned'], ['Last seen', resource.lastSeenAt ? new Date(resource.lastSeenAt).toLocaleString() : 'Never']].map(([label, value]) => <div className="flex items-center justify-between gap-3 text-xs" key={label}><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 truncate font-semibold text-foreground" title={value}>{value}</dd></div>)}</dl>
-      <div className="mt-auto -mx-5 -mb-5 grid grid-cols-2 gap-2 border-t border-border p-3 px-5 sm:grid-cols-3"><Button variant="secondary" size="sm" type="button" onClick={onAssignment}><Unplug />{resource.assignment ? 'Unassign' : 'Assign'}</Button><Button variant="outline" size="sm" type="button" onClick={onDiagnostics}><Activity />Diagnostics</Button><Button variant="outline" size="sm" type="button" onClick={onBleSync}><Bluetooth />BLE sync</Button><Button variant="outline" size="sm" type="button" onClick={onEdit}><Pencil />Edit</Button><Button className="sm:col-start-3" variant="destructive-outline" size="sm" type="button" onClick={onDelete}><Trash2 />Delete</Button></div>
+      <div className="mt-auto grid gap-2"><Button className="w-full" variant="secondary" size="sm" type="button" onClick={onAssignment}><Unplug />{resource.assignment ? 'End assignment' : 'Assign sensor'}</Button><div className="grid grid-cols-2 gap-2"><Button variant="outline" size="sm" type="button" onClick={onDiagnostics}><Activity />Diagnostics</Button><Button variant="outline" size="sm" type="button" onClick={onBleSync}><Bluetooth />BLE sync</Button></div></div>
+      <EditDeleteActions onEdit={onEdit} onDelete={onDelete} />
     </article>
   )
 }
@@ -410,10 +397,7 @@ export function ResourcesPage() {
 
   return (
     <div className="mx-auto w-full max-w-[1180px] px-8 pt-12 pb-7 max-[780px]:px-4 max-[780px]:py-6">
-      <div className="mb-6 flex items-center justify-between gap-4 max-[560px]:flex-col max-[560px]:items-stretch">
-        <div><h1 className="text-3xl font-bold tracking-[-.04em] max-[780px]:sr-only">Resources</h1><p className="mt-2 text-sm text-muted-foreground max-[780px]:mt-0">Manage the operational resources SIRIP is allowed to use.</p></div>
-        <Button type="button" onClick={(event) => openDialog(undefined, event.currentTarget)}><Plus />Add {resourceLabel}</Button>
-      </div>
+      <PageHeader title="Resources" description="Manage the operational resources SIRIP is allowed to use." action={<Button type="button" onClick={(event) => openDialog(undefined, event.currentTarget)}><Plus />Add {resourceLabel}</Button>} />
 
       <Tabs value={type} onValueChange={setType}>
         <div className="mb-5 overflow-x-auto rounded-xl border border-border bg-card p-1">
@@ -428,7 +412,7 @@ export function ResourcesPage() {
           {query.isError && <div className="flex min-h-72 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-red-200 bg-red-50/40 px-5 text-center" role="alert"><strong className="text-sm text-foreground">Could not load resources</strong><span className="max-w-sm text-xs text-muted-foreground">{apiError(query.error)}</span><Button className="mt-2" variant="outline" type="button" onClick={() => query.refetch()}>Try again</Button></div>}
           {query.isSuccess && !query.data.length && <div className="flex min-h-72 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-slate-300 bg-white/50 px-5 text-center" role="status"><ResourceIcon>{isColdStorage ? <Snowflake size={22} /> : isVehicle ? <Truck size={22} /> : isDestination ? <MapPin size={22} /> : <Cpu size={22} />}</ResourceIcon><strong className="mt-1 text-sm text-foreground">No {resourceLabel} configured</strong><span className="max-w-sm text-xs text-muted-foreground">Add every resource your operation can use.</span><Button className="mt-2" type="button" onClick={(event) => openDialog(undefined, event.currentTarget)}><Plus />Add first resource</Button></div>}
           {query.isSuccess && query.data.length > 0 && (
-            <Appear className="grid grid-cols-3 gap-3.5 max-[1020px]:grid-cols-2 max-[780px]:grid-cols-1" key={type} stagger="[data-animate-card]">
+            <Appear className="grid grid-cols-3 gap-3.5 max-[1020px]:grid-cols-2 max-[640px]:grid-cols-1" key={type} stagger="[data-animate-card]">
           {query.data.map((resource) => isColdStorage
             ? <ColdStorageCard key={resource.id} resource={resource} onEdit={(event) => openDialog(resource, event.currentTarget)} onDelete={(event) => remove(resource, event.currentTarget)} />
             : isVehicle

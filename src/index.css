@@ -53,6 +53,16 @@ body { min-width: 320px; min-height: 100vh; margin: 0; background: var(--backgro
 button, a { -webkit-tap-highlight-color: transparent; }
 :focus-visible { outline: 3px solid rgb(34 105 196 / 35%); outline-offset: 2px; }
 
+@keyframes dialog-overlay-in { from { opacity: 0; backdrop-filter: blur(0); } to { opacity: 1; backdrop-filter: blur(4px); } }
+@keyframes dialog-overlay-out { from { opacity: 1; backdrop-filter: blur(4px); } to { opacity: 0; backdrop-filter: blur(0); } }
+@keyframes dialog-content-in { from { opacity: 0; transform: translate(-50%, calc(-50% + 16px)); } to { opacity: 1; transform: translate(-50%, -50%); } }
+@keyframes dialog-content-out { from { opacity: 1; transform: translate(-50%, -50%); } to { opacity: 0; transform: translate(-50%, calc(-50% + 8px)); } }
+
+.dialog-overlay-motion[data-state="open"] { animation: dialog-overlay-in 380ms cubic-bezier(.16, 1, .3, 1) both; }
+.dialog-overlay-motion[data-state="closed"] { animation: dialog-overlay-out 180ms ease-in both; }
+.dialog-content-motion[data-state="open"] { animation: dialog-content-in 420ms cubic-bezier(.16, 1, .3, 1) both; }
+.dialog-content-motion[data-state="closed"] { animation: dialog-content-out 180ms ease-in both; }
+
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition-duration: .01ms !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; }
 }

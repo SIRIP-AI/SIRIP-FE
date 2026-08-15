@@ -59,6 +59,10 @@ export async function completeFishingTrip(id) {
   return fishingTripSchema.parse((await api.post(`/api/fishing-trips/${id}/complete`)).data)
 }
 
+export async function deleteFishingTrip(id) {
+  await api.delete(`/api/fishing-trips/${id}`)
+}
+
 export async function listBatches() {
   return z.array(batchSchema).parse((await api.get('/api/batches')).data)
 }
@@ -69,6 +73,10 @@ export async function saveBatch(batch) {
     ? await api.put(`/api/batches/${batch.id}`, input)
     : await api.post('/api/batches', input)
   return batchSchema.parse(response.data)
+}
+
+export async function deleteBatch(id) {
+  await api.delete(`/api/batches/${id}`)
 }
 
 export function apiError(error) {
