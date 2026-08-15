@@ -3,7 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom'
 import { AppShell } from '@/components/app-shell.jsx'
 import { BatchesPage } from '@/features/batches/batches-page.jsx'
 import { FishingTripsPage } from '@/features/batches/fishing-trips-page.jsx'
-import { PlansPage } from '@/features/plans/plans-page.jsx'
+import { PlanDetailsPage, PlansLayout, PlansPage } from '@/features/plans/plans-page.jsx'
 import { ResourcesPage } from '@/features/resources/resources-page.jsx'
 
 export function AppRouter() {
@@ -13,7 +13,10 @@ export function AppRouter() {
         <Route index element={<Navigate replace to="/resources" />} />
         <Route path="batches" element={<BatchesPage />} />
         <Route path="fishing-trips" element={<FishingTripsPage />} />
-        <Route path="plans" element={<PlansPage />} />
+        <Route path="plans" element={<PlansLayout />}>
+          <Route index element={<PlansPage />} />
+          <Route path=":planId" element={<PlanDetailsPage />} />
+        </Route>
         <Route path="resources" element={<ResourcesPage />} />
       </Route>
     </Routes>
