@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Boxes,
+  Ship,
   Blocks,
   LayoutDashboard,
   Menu,
@@ -15,8 +16,9 @@ import { cn } from '@/lib/utils.js'
 
 const navigation = [
   { label: 'Overview', icon: LayoutDashboard, path: '/' },
-  { label: 'Batches', icon: Boxes },
-  { label: 'Plan', icon: Route },
+  { label: 'Batches', icon: Boxes, path: '/batches' },
+  { label: 'Fishing Trips', icon: Ship, path: '/fishing-trips' },
+  { label: 'Plans', icon: Route, path: '/plans' },
   { label: 'Resources', icon: Blocks, path: '/resources' },
 ]
 
@@ -58,7 +60,7 @@ export function AppShell() {
   const menuButtonRef = useRef(null)
   const sidebarWasOpen = useRef(false)
   const location = useLocation()
-  const title = location.pathname === '/resources' ? 'Resources' : 'Overview'
+  const title = location.pathname === '/resources' ? 'Resources' : location.pathname === '/batches' ? 'Batches' : location.pathname === '/fishing-trips' ? 'Fishing Trips' : location.pathname === '/plans' ? 'Plans' : 'Overview'
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 780px)')
