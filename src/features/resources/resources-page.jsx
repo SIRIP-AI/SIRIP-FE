@@ -69,7 +69,7 @@ function ResourceStatusBadge({ status }) {
   return <StatusBadge tone={tones[status] ?? 'neutral'}>{labels[status] ?? status}</StatusBadge>
 }
 
-function ResourceDialogContent({ className = '', children, ...props }) { return <DialogContent className={`max-h-[calc(100vh-2rem)] max-w-[560px] overflow-y-auto p-6 shadow-[0_24px_80px_rgb(2_40_88_/_24%)] sm:p-6 ${className}`} {...props}>{children}</DialogContent> }
+function ResourceDialogContent({ className = '', children, ...props }) { return <DialogContent className={`max-w-[560px] p-6 shadow-[0_24px_80px_rgb(2_40_88_/_24%)] sm:p-6 ${className}`} {...props}>{children}</DialogContent> }
 
 function DialogHeading({ eyebrow, title }) {
   return <DialogHeader className="pr-10"><span className="text-[10px] font-bold tracking-[.08em] text-primary uppercase">{eyebrow}</span><DialogTitle className="text-[21px] font-bold tracking-[-.03em]">{title}</DialogTitle></DialogHeader>
