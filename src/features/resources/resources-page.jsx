@@ -7,7 +7,6 @@ import {
   apiError,
   assignSensor,
   coldStorageInputSchema,
-  coldStorageStatuses,
   deleteResource,
   destinationInputSchema,
   destinationStatuses,
@@ -19,7 +18,7 @@ import {
   sensorProvisioningStatuses,
   unassignSensor,
   vehicleInputSchema,
-  vehicleStatuses,
+  resourceOperationalStatuses,
 } from '@/features/resources/resources-api.js'
 
 const tabs = [
@@ -33,7 +32,6 @@ const labels = {
   FULL: 'Full',
   UNAVAILABLE: 'Unavailable',
   ASSIGNED: 'Assigned',
-  DELAYED: 'Delayed',
   PENDING: 'Pending',
   PROVISIONED: 'Provisioned',
   ONLINE: 'Online',
@@ -46,7 +44,6 @@ const tones = {
   AVAILABLE: 'healthy',
   FULL: 'warning',
   ASSIGNED: 'neutral',
-  DELAYED: 'warning',
   UNAVAILABLE: 'critical',
   PENDING: 'warning',
   PROVISIONED: 'healthy',
@@ -58,13 +55,6 @@ const tones = {
 
 function StatusBadge({ status }) {
   return <span className={`status-badge status-${tones[status]}`}><span className="status-dot" />{labels[status]}</span>
-}
-
-function localDateTime(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  date.setMinutes(date.getMinutes() - date.getTimezoneOffset())
-  return date.toISOString().slice(0, 16)
 }
 
 function ResourceDialog({ type, resource, onClose, onComplete }) {
@@ -95,14 +85,14 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
       name: form.get('name'),
       capacityKg: Number(form.get('capacityKg')),
       availableCapacityKg: Number(form.get('availableCapacityKg')),
-      status: form.get('status'),
+      operationalStatus: form.get('operationalStatus'),
     } : isVehicle ? {
       code: form.get('code'),
       capacityKg: Number(form.get('capacityKg')),
-      status: form.get('status'),
-      delayMinutes: Number(form.get('delayMinutes')),
+      operationalStatus: form.get('operationalStatus'),
       restriction: form.get('restriction')?.trim() || null,
-      availableFrom: form.get('availableFrom') ? new Date(form.get('availableFrom')).toISOString() : null,
+      availabilityStart: form.get('availabilityStart') || null,
+      availabilityEnd: form.get('availabilityEnd') || null,
     } : isDestination ? {
       name: form.get('name'),
       address: form.get('address'),
@@ -141,18 +131,18 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
               <label>Total capacity (kg)<input name="capacityKg" type="number" min="0.01" step="0.01" defaultValue={resource?.capacityKg ?? ''} aria-invalid={Boolean(errors.capacityKg)} />{errors.capacityKg && <span>{errors.capacityKg}</span>}</label>
               <label>Available capacity (kg)<input name="availableCapacityKg" type="number" min="0" step="0.01" defaultValue={resource?.availableCapacityKg ?? ''} aria-invalid={Boolean(errors.availableCapacityKg)} />{errors.availableCapacityKg && <span>{errors.availableCapacityKg}</span>}</label>
             </div>
-            <label>Status<select name="status" defaultValue={resource?.status ?? 'AVAILABLE'}>{coldStorageStatuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select></label>
+            <label>Operational status<select name={resource?.status === 'FULL' ? undefined : 'operationalStatus'} defaultValue={resource?.operationalStatus ?? 'AVAILABLE'} disabled={resource?.status === 'FULL'}>{resourceOperationalStatuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select>{resource?.status === 'FULL' && <><input name="operationalStatus" type="hidden" value={resource.operationalStatus} /><span>Status cannot be changed while storage is full.</span></>}</label>
           </>
         ) : isVehicle ? (
           <>
             <label>Truck ID<input name="code" defaultValue={resource?.code ?? ''} placeholder="TR-02" autoFocus aria-invalid={Boolean(errors.code)} />{errors.code && <span>{errors.code}</span>}</label>
-            <div className="form-grid">
-              <label>Capacity (kg)<input name="capacityKg" type="number" min="0.01" step="0.01" defaultValue={resource?.capacityKg ?? ''} aria-invalid={Boolean(errors.capacityKg)} />{errors.capacityKg && <span>{errors.capacityKg}</span>}</label>
-              <label>Delay (minutes)<input name="delayMinutes" type="number" min="0" step="1" defaultValue={resource?.delayMinutes ?? 0} aria-invalid={Boolean(errors.delayMinutes)} />{errors.delayMinutes && <span>{errors.delayMinutes}</span>}</label>
-            </div>
+            <label>Capacity (kg)<input name="capacityKg" type="number" min="0.01" step="0.01" defaultValue={resource?.capacityKg ?? ''} aria-invalid={Boolean(errors.capacityKg)} />{errors.capacityKg && <span>{errors.capacityKg}</span>}</label>
             <label>Restriction<textarea name="restriction" defaultValue={resource?.restriction ?? ''} placeholder="Road, loading, or operational restriction" maxLength="500" aria-invalid={Boolean(errors.restriction)} />{errors.restriction && <span>{errors.restriction}</span>}</label>
-            <label>Available from<input name="availableFrom" type="datetime-local" defaultValue={localDateTime(resource?.availableFrom)} aria-invalid={Boolean(errors.availableFrom)} />{errors.availableFrom && <span>{errors.availableFrom}</span>}</label>
-            <label>Status<select name="status" defaultValue={resource?.status ?? 'AVAILABLE'}>{vehicleStatuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select></label>
+            <div className="form-grid">
+              <label>Available from<input name="availabilityStart" type="time" defaultValue={resource?.availabilityStart ?? ''} aria-invalid={Boolean(errors.availabilityStart)} />{errors.availabilityStart && <span>{errors.availabilityStart}</span>}</label>
+              <label>Available until<input name="availabilityEnd" type="time" defaultValue={resource?.availabilityEnd ?? ''} aria-invalid={Boolean(errors.availabilityEnd)} />{errors.availabilityEnd && <span>{errors.availabilityEnd}</span>}</label>
+            </div>
+            <label>Operational status<select name="operationalStatus" defaultValue={resource?.operationalStatus ?? 'AVAILABLE'}>{resourceOperationalStatuses.map((status) => <option key={status} value={status}>{labels[status]}</option>)}</select></label>
           </>
         ) : isDestination ? (
           <>
@@ -203,7 +193,7 @@ function VehicleCard({ resource, onEdit, onDelete }) {
     <article className="resource-card">
       <div className="resource-card-heading"><div className="resource-icon"><Truck size={20} /></div><StatusBadge status={resource.status} /></div>
       <div><h3>{resource.code}</h3><p>{resource.capacityKg.toLocaleString()} kg load capacity</p></div>
-      <div className="vehicle-detail"><Clock3 size={16} /><span>{resource.restriction ?? (resource.delayMinutes ? `${resource.delayMinutes} minute delay` : resource.availableFrom ? `Available ${new Date(resource.availableFrom).toLocaleString()}` : 'No known delay or restriction')}</span></div>
+      <div className="vehicle-detail"><Clock3 size={16} /><span>{resource.availabilityStart ? `Available ${resource.availabilityStart}–${resource.availabilityEnd}` : 'No availability window configured'}{resource.delayMinutes > 0 && ` · Delayed ${resource.delayMinutes} min`}{resource.restriction && ` · ${resource.restriction}`}</span></div>
       <div className="resource-actions"><button type="button" onClick={onEdit}><Pencil size={15} />Edit</button><button className="delete-button" type="button" onClick={onDelete}><Trash2 size={15} />Delete</button></div>
     </article>
   )

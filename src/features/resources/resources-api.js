@@ -3,7 +3,8 @@ import { z } from 'zod'
 import { api } from '@/lib/axios.js'
 
 export const coldStorageStatuses = ['AVAILABLE', 'FULL', 'UNAVAILABLE']
-export const vehicleStatuses = ['AVAILABLE', 'ASSIGNED', 'DELAYED', 'UNAVAILABLE']
+export const resourceOperationalStatuses = ['AVAILABLE', 'UNAVAILABLE']
+export const vehicleStatuses = ['AVAILABLE', 'ASSIGNED', 'UNAVAILABLE']
 export const destinationStatuses = ['AVAILABLE', 'UNAVAILABLE']
 export const sensorProvisioningStatuses = ['PENDING', 'PROVISIONED']
 
@@ -11,7 +12,7 @@ export const coldStorageInputSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
   capacityKg: z.number().positive('Capacity must be greater than zero'),
   availableCapacityKg: z.number().nonnegative('Available capacity cannot be negative'),
-  status: z.enum(coldStorageStatuses),
+  operationalStatus: z.enum(resourceOperationalStatuses),
 }).refine((value) => value.availableCapacityKg <= value.capacityKg, {
   message: 'Available capacity cannot exceed total capacity',
   path: ['availableCapacityKg'],
@@ -20,10 +21,16 @@ export const coldStorageInputSchema = z.object({
 export const vehicleInputSchema = z.object({
   code: z.string().trim().min(1, 'Truck ID is required').max(100),
   capacityKg: z.number().positive('Capacity must be greater than zero'),
-  status: z.enum(vehicleStatuses),
-  delayMinutes: z.number().int().nonnegative('Delay cannot be negative'),
+  operationalStatus: z.enum(resourceOperationalStatuses),
   restriction: z.string().trim().max(500).nullish().transform((value) => value ?? null),
-  availableFrom: z.string().datetime().nullish().transform((value) => value ?? null),
+  availabilityStart: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable(),
+  availabilityEnd: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable(),
+}).refine((value) => (value.availabilityStart === null) === (value.availabilityEnd === null), {
+  message: 'Start and end time must both be provided',
+  path: ['availabilityEnd'],
+}).refine((value) => !value.availabilityStart || !value.availabilityEnd || value.availabilityEnd > value.availabilityStart, {
+  message: 'End time must be after start time',
+  path: ['availabilityEnd'],
 })
 
 export const destinationInputSchema = z.object({
@@ -41,11 +48,14 @@ export const destinationInputSchema = z.object({
 
 const coldStorageSchema = coldStorageInputSchema.safeExtend({
   id: z.string(),
+  status: z.enum(coldStorageStatuses),
   updatedAt: z.string().datetime(),
 })
 
 const vehicleSchema = vehicleInputSchema.safeExtend({
   id: z.string(),
+  status: z.enum(vehicleStatuses),
+  delayMinutes: z.number().int().nonnegative(),
   updatedAt: z.string().datetime(),
 })
 
