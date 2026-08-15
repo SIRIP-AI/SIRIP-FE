@@ -5,6 +5,7 @@ import { api } from '@/lib/axios.js'
 export const coldStorageStatuses = ['AVAILABLE', 'FULL', 'UNAVAILABLE']
 export const vehicleStatuses = ['AVAILABLE', 'ASSIGNED', 'DELAYED', 'UNAVAILABLE']
 export const destinationStatuses = ['AVAILABLE', 'UNAVAILABLE']
+export const sensorProvisioningStatuses = ['PENDING', 'PROVISIONED']
 
 export const coldStorageInputSchema = z.object({
   name: z.string().trim().min(1, 'Name is required').max(100),
@@ -53,10 +54,26 @@ const destinationSchema = destinationInputSchema.safeExtend({
   updatedAt: z.string().datetime(),
 })
 
+export const sensorInputSchema = z.object({
+  code: z.string().trim().min(1, 'Sensor ID is required').max(100),
+  deviceUid: z.string().trim().min(1, 'Device UID is required').max(100),
+  provisioningStatus: z.enum(sensorProvisioningStatuses),
+})
+
+const sensorSchema = sensorInputSchema.safeExtend({
+  id: z.string(),
+  status: z.enum(['AVAILABLE', 'ASSIGNED', 'OFFLINE', 'ERROR']),
+  connectivityStatus: z.enum(['ONLINE', 'OFFLINE', 'ERROR', 'NEVER_CONNECTED']),
+  lastSeenAt: z.string().datetime().nullable(),
+  createdAt: z.string().datetime(),
+  assignment: z.object({ batchCode: z.string(), lastSyncedAt: z.string().datetime().nullable() }).nullable(),
+})
+
 const resources = {
   'cold-storages': { response: z.array(coldStorageSchema), item: coldStorageSchema, input: coldStorageInputSchema },
   vehicles: { response: z.array(vehicleSchema), item: vehicleSchema, input: vehicleInputSchema },
   destinations: { response: z.array(destinationSchema), item: destinationSchema, input: destinationInputSchema },
+  sensors: { response: z.array(sensorSchema), item: sensorSchema, input: sensorInputSchema },
 }
 
 export async function listResources(type) {
@@ -73,6 +90,31 @@ export async function saveResource(type, resource) {
 
 export async function deleteResource(type, id) {
   await api.delete(`/api/${type}/${id}`)
+}
+
+const batchOptionSchema = z.object({ id: z.string(), code: z.string(), weightKg: z.number(), grade: z.string() })
+
+export async function listSensorAssignmentOptions() {
+  return z.array(batchOptionSchema).parse((await api.get('/api/sensor-assignment-options')).data)
+}
+
+export async function assignSensor(id, batchCode) {
+  return sensorSchema.parse((await api.post(`/api/sensors/${id}/assignment`, { batchCode })).data)
+}
+
+export async function unassignSensor(id) {
+  return sensorSchema.parse((await api.delete(`/api/sensors/${id}/assignment`)).data)
+}
+
+const diagnosticsSchema = z.object({
+  sensor: sensorSchema,
+  latestReading: z.object({ temperatureC: z.number(), measuredAt: z.string().datetime(), receivedAt: z.string().datetime() }).nullable(),
+  lastSyncedAt: z.string().datetime().nullable(),
+  sessionStatus: z.enum(['ACTIVE', 'COMPLETED']).nullable(),
+})
+
+export async function getSensorDiagnostics(id) {
+  return diagnosticsSchema.parse((await api.get(`/api/sensors/${id}/diagnostics`)).data)
 }
 
 export function apiError(error) {
