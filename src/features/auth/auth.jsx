@@ -7,6 +7,10 @@ import { authError, login, loginInputSchema, logout, sessionQueryOptions, signup
 
 const seededAccount = { email: 'adi.rahman@sirip.id', password: 'SiripDemo2026!' }
 
+function clearAccountData(queryClient) {
+  queryClient.removeQueries({ predicate: ({ queryKey }) => queryKey[0] !== 'auth' })
+}
+
 export function AuthenticatedApp() {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
@@ -15,6 +19,7 @@ export function AuthenticatedApp() {
   const logoutMutation = useMutation({
     mutationFn: logout,
     onSuccess: () => {
+      clearAccountData(queryClient)
       queryClient.setQueryData(sessionQueryOptions.queryKey, null)
       navigate('/login', { replace: true })
     },
@@ -37,6 +42,7 @@ export function LoginPage() {
   const mutation = useMutation({
     mutationFn: login,
     onSuccess: (user) => {
+      clearAccountData(queryClient)
       queryClient.setQueryData(sessionQueryOptions.queryKey, user)
       navigate(location.state?.from ?? '/', { replace: true })
     },
@@ -89,6 +95,7 @@ export function SignupPage() {
   const mutation = useMutation({
     mutationFn: signup,
     onSuccess: (user) => {
+      clearAccountData(queryClient)
       queryClient.setQueryData(sessionQueryOptions.queryKey, user)
       navigate('/', { replace: true })
     },
