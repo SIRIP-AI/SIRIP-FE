@@ -181,6 +181,10 @@ button, a { color: inherit; font: inherit; -webkit-tap-highlight-color: transpar
 .button-secondary:hover { background: #f8fafc; }
 .button-danger { color: white; background: var(--red); }
 .button-danger:hover { background: #b91c1c; }
+.overview-empty { display: flex; min-height: 190px; flex-direction: column; align-items: center; justify-content: center; gap: 7px; color: var(--muted); text-align: center; }
+.overview-empty strong, .overview-clear strong { color: var(--primary); font-size: var(--text-body); }
+.overview-empty span, .overview-clear span { font-size: var(--text-small); }
+.overview-clear { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: var(--space-2); padding: 16px 18px; border: 1px solid #bbf7d0; border-radius: var(--radius); color: var(--muted); background: #f0fdf4; }
 .quality-disclaimer { margin: 16px 0 0; color: var(--subtle); font-size: 11px; }
 .sidebar-backdrop { display: none; }
 
