@@ -51,6 +51,8 @@ button, a { color: inherit; font: inherit; -webkit-tap-highlight-color: transpar
 .login-form [aria-invalid="true"] { border-color: #ef4444; }
 .login-form label > span { color: #b91c1c; font-size: 10px; font-weight: 550; }
 .login-submit { width: 100%; min-height: 44px; margin-top: 2px; }
+.auth-switch { margin: 22px 0 0; color: var(--muted); font-size: var(--text-small); text-align: center; }
+.auth-switch a { color: var(--secondary); font-weight: 700; }
 
 .sidebar {
   position: fixed;

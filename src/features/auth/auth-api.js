@@ -7,6 +7,17 @@ export const loginInputSchema = z.object({
   password: z.string().min(1, 'Password is required'),
 })
 
+export const signupInputSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(100),
+  email: z.email('Enter a valid email address'),
+  phone: z.string().trim().regex(/^\+?[0-9][0-9 ()-]{6,19}$/, 'Enter a valid phone number'),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  confirmPassword: z.string(),
+}).refine((value) => value.password === value.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+})
+
 const userSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -32,6 +43,16 @@ export const sessionQueryOptions = {
 
 export async function login(credentials) {
   return authResponseSchema.parse((await api.post('/api/auth/login', loginInputSchema.parse(credentials))).data).user
+}
+
+export async function signup(input) {
+  const registration = signupInputSchema.parse(input)
+  return authResponseSchema.parse((await api.post('/api/auth/signup', {
+    name: registration.name,
+    email: registration.email,
+    phone: registration.phone,
+    password: registration.password,
+  })).data).user
 }
 
 export async function logout() {
