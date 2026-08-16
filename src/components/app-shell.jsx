@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Boxes,
   LayoutDashboard,
+  LogOut,
   Menu,
   MessageCircle,
   Route,
@@ -17,7 +18,11 @@ const navigation = [
   { label: 'Setup', icon: Settings2, path: '/setup' },
 ]
 
-function Sidebar({ isMobile, open, closeButtonRef, onClose }) {
+function initials(name) {
+  return name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function Sidebar({ isMobile, open, closeButtonRef, onClose, user, onLogout, logoutPending }) {
   return (
     <aside
       className={`sidebar ${open ? 'sidebar-open' : ''}`}
@@ -41,14 +46,15 @@ function Sidebar({ isMobile, open, closeButtonRef, onClose }) {
       </nav>
 
       <div className="operator-card">
-        <span className="avatar">AR</span>
-        <div><strong>Adi Rahman</strong><span>Operations coordinator</span></div>
+        <span className="avatar">{initials(user.name)}</span>
+        <div><strong>{user.name}</strong><span>Operations coordinator</span></div>
+        <button className="operator-logout" type="button" onClick={onLogout} disabled={logoutPending} aria-label="Sign out"><LogOut size={16} /></button>
       </div>
     </aside>
   )
 }
 
-export function AppShell() {
+export function AppShell({ user, onLogout, logoutPending }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 780px)').matches)
   const closeButtonRef = useRef(null)
@@ -122,7 +128,7 @@ export function AppShell() {
 
   return (
     <div className="app-shell">
-      <Sidebar isMobile={isMobile} open={sidebarOpen} closeButtonRef={closeButtonRef} onClose={() => setSidebarOpen(false)} />
+      <Sidebar isMobile={isMobile} open={sidebarOpen} closeButtonRef={closeButtonRef} onClose={() => setSidebarOpen(false)} user={user} onLogout={onLogout} logoutPending={logoutPending} />
       {sidebarOpen && <button className="sidebar-backdrop" type="button" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)} />}
 
       <main className="main-content" inert={isMobile && sidebarOpen ? true : undefined}>
