@@ -1,5 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { AlertTriangle, Check, MessageCircle } from 'lucide-react'
+import { Link } from 'react-router-dom'
 
 import { Appear } from '@/components/appear.jsx'
 import { overviewQueryOptions } from '@/features/overview/overview-api.js'
@@ -82,7 +83,7 @@ export function OverviewPage() {
                 )
               })}
             </div>
-          ) : <div className="overview-empty"><strong>No active batches</strong><span>Newly registered accounts start with an empty operation.</span></div>}
+          ) : <div className="overview-empty"><strong>No active batches</strong><Link className="button button-primary" to="/fishing-trips">Start an operation here</Link></div>}
         </Appear>
 
         <Appear as="section" className="panel plan-panel" delay={0.14}>
