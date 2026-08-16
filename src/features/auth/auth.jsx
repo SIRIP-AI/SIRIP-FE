@@ -67,7 +67,7 @@ export function LoginPage() {
     <main className="login-page">
       <section className="login-card" aria-labelledby="login-title">
         <img className="login-logo" src="/logo/sirip-color.png" alt="SIRIP" />
-        <div className="login-heading"><span>Cold-chain operations</span><h1 id="login-title">Sign in to SIRIP</h1><p>Use your operator account to access the dashboard.</p></div>
+        <div className="login-heading"><span>Cold-chain operations</span><h1 id="login-title">Sign in to SIRIP</h1></div>
         <div className="seeded-account"><div><strong>Demo operator</strong><span>{seededAccount.email}</span></div><button type="button" onClick={autofillSeededAccount}>Use seeded account</button></div>
         <form ref={formRef} className="login-form" onSubmit={submit}>
           <label>Email<input name="email" type="email" autoComplete="username" autoFocus aria-invalid={Boolean(errors.email)} />{errors.email && <span>{errors.email}</span>}</label>
@@ -75,7 +75,7 @@ export function LoginPage() {
           {mutation.isError && <p className="form-error" role="alert">{authError(mutation.error)}</p>}
           <button className="button button-primary login-submit" type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Signing in…' : 'Sign in'}</button>
         </form>
-        <p className="auth-switch">Need an account? <Link to="/signup">Sign up</Link></p>
+        <p className="auth-switch">Don't have an account? <Link to="/signup">Sign up</Link></p>
       </section>
     </main>
   )
