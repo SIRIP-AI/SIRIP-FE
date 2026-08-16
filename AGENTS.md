@@ -28,6 +28,14 @@ When documents overlap, preserve the explicit MVP rules in the most task-specifi
 
 Do not add parallel libraries for responsibilities already covered by this stack.
 
+Use Tailwind utilities by default for component layout, spacing, responsive behavior, and interaction states. Keep handwritten CSS for global tokens, base styles, keyframes, and cases that Tailwind cannot express clearly.
+
+Use shadcn/ui primitives for standard interactive controls rather than hand-rolling dialogs, selects, buttons, inputs, and similar components. Keep generated primitives in `src/components/ui` and adapt them through variants, tokens, and composition rather than editing around them with duplicate controls.
+
+Use GSAP for deliberate entrance, exit, sequencing, and state-transition motion, not simple hover or focus effects. Scope animations to component refs, revert them on cleanup, prefer transforms and opacity, and skip nonessential motion when `prefers-reduced-motion` is enabled.
+
+Migrate legacy UI incrementally when touching a component. Do not perform unrelated bulk styling rewrites solely for consistency.
+
 ## Architecture
 
 Use a feature-sliced file structure. Product behavior belongs under:

@@ -1,24 +1,25 @@
-import { useEffect, useRef } from 'react'
+import { useLayoutEffect, useRef } from 'react'
 import gsap from 'gsap'
 
-export function Appear({ as: Component = 'div', children, className = '', delay = 0, ...props }) {
+export function Appear({ as: Component = 'div', children, className = '', delay = 0, stagger, ...props }) {
   const elementRef = useRef(null)
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const element = elementRef.current
-    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-    if (!element || reduceMotion) return
+    if (!element) return
 
-    const context = gsap.context(() => {
+    const media = gsap.matchMedia()
+    media.add('(prefers-reduced-motion: no-preference)', () => {
+      const targets = stagger ? element.querySelectorAll(stagger) : element
       gsap.fromTo(
-        element,
+        targets,
         { autoAlpha: 0, y: 16 },
-        { autoAlpha: 1, y: 0, duration: 0.55, delay, ease: 'power2.out', clearProps: 'all' },
+        { autoAlpha: 1, y: 0, duration: 0.45, delay, stagger: stagger ? 0.055 : 0, ease: 'power2.out', clearProps: 'opacity,visibility,transform' },
       )
     }, element)
 
-    return () => context.revert()
-  }, [delay])
+    return () => media.revert()
+  }, [delay, stagger])
 
   return (
     <Component ref={elementRef} className={className} {...props}>
