@@ -478,7 +478,7 @@ function DeleteDialog({ resource, type, onClose, onComplete }) {
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <ResourceDialogContent className="grid gap-4">
         <DialogHeading eyebrow="Delete resource" title={name} />
-        <DialogDescription className="text-sm leading-relaxed text-slate-600">This removes the resource. Resources referenced by operational history cannot be deleted.</DialogDescription>
+        <DialogDescription className="text-sm leading-relaxed text-slate-600">{type === 'sensors' ? 'The sensor will be removed from active resources while its completed monitoring history is retained. End its assignment first.' : 'This removes the resource. Resources referenced by operational history cannot be deleted.'}</DialogDescription>
         {mutation.isError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">{apiError(mutation.error)}</p>}
         <DialogFooter className="mt-1 -mx-6 -mb-6 p-4 sm:px-6"><Button variant="outline" type="button" onClick={onClose}>Cancel</Button><Button variant="destructive" type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending}>{mutation.isPending ? 'Deleting…' : 'Delete resource'}</Button></DialogFooter>
       </ResourceDialogContent>
