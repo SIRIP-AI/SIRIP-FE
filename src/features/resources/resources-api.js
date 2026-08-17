@@ -88,6 +88,12 @@ const sensorSchema = sensorInputSchema.safeExtend({
   assignment: z.object({ batchCode: z.string(), lastSyncedAt: z.string().datetime().nullable() }).nullable(),
 })
 
+const temperatureReadingSchema = z.object({
+  temperatureC: z.number(),
+  measuredAt: z.string().datetime(),
+  receivedAt: z.string().datetime(),
+})
+
 const resources = {
   'cold-storages': { response: z.array(coldStorageSchema), item: coldStorageSchema, input: coldStorageInputSchema },
   vehicles: { response: z.array(vehicleSchema), item: vehicleSchema, input: vehicleInputSchema },
@@ -128,6 +134,10 @@ export async function listSensorAssignmentOptions() {
   return z.array(batchOptionSchema).parse((await api.get('/api/sensor-assignment-options')).data)
 }
 
+export async function listSensorReadings(id) {
+  return z.array(temperatureReadingSchema).max(100).parse((await api.get(`/api/sensors/${id}/readings`)).data)
+}
+
 export async function assignSensor(id, batchCode) {
   return sensorSchema.parse((await api.post(`/api/sensors/${id}/assignment`, { batchCode })).data)
 }
@@ -138,7 +148,7 @@ export async function unassignSensor(id) {
 
 const diagnosticsSchema = z.object({
   sensor: sensorSchema,
-  latestReading: z.object({ temperatureC: z.number(), measuredAt: z.string().datetime(), receivedAt: z.string().datetime() }).nullable(),
+  latestReading: temperatureReadingSchema.nullable(),
   lastSyncedAt: z.string().datetime().nullable(),
   sessionStatus: z.enum(['ACTIVE', 'COMPLETED']).nullable(),
 })

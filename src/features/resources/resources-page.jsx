@@ -1,6 +1,6 @@
 import { Children, cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bluetooth, BluetoothSearching, Check, CheckCircle2, Clock3, Cpu, LoaderCircle, MapPin, Pencil, Plus, Server, Snowflake, Trash2, Truck, Unplug, Wifi } from 'lucide-react'
+import { Bluetooth, BluetoothSearching, Check, CheckCircle2, Clock3, Cpu, LoaderCircle, MapPin, Pencil, Plus, RefreshCw, Server, Snowflake, Trash2, Truck, Unplug, Wifi } from 'lucide-react'
 
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Appear } from '@/components/appear.jsx'
@@ -23,6 +23,7 @@ import {
   getSetupReadiness,
   listResources,
   listSensorAssignmentOptions,
+  listSensorReadings,
   saveResource,
   sensorProvisioningFormSchema,
   unassignSensor,
@@ -487,14 +488,71 @@ function DeleteDialog({ resource, type, onClose, onComplete }) {
 }
 
 function SensorCard({ resource, onDelete, onAssignment }) {
+  const queryClient = useQueryClient()
+  const [refreshing, setRefreshing] = useState(false)
+  const readings = useQuery({
+    queryKey: ['resources', 'sensors', resource.id, 'readings'],
+    queryFn: () => listSensorReadings(resource.id),
+    refetchInterval: 15_000,
+    enabled: resource.provisioningStatus === 'PROVISIONED',
+  })
+  const latest = readings.data?.at(-1)
+
+  async function refresh() {
+    setRefreshing(true)
+    try {
+      await Promise.all([
+        readings.refetch(),
+        queryClient.refetchQueries({ queryKey: ['resources', 'sensors'], exact: true }),
+      ])
+    } finally {
+      setRefreshing(false)
+    }
+  }
+
   return (
     <article className={cardClass} data-animate-card>
       <div className="flex items-center justify-between gap-3"><ResourceIcon><Cpu size={20} /></ResourceIcon><ResourceStatusBadge status={resource.connectivityStatus} /></div>
       <div><h3 className="text-lg font-bold tracking-[-.025em]">{resource.code}</h3><p className="mt-1.5 text-xs text-muted-foreground">{resource.deviceUid}</p></div>
+      <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-foreground">Temperature history</span><Button variant="outline" size="sm" type="button" onClick={refresh} disabled={refreshing || resource.provisioningStatus !== 'PROVISIONED'}><RefreshCw className={refreshing ? 'animate-spin' : ''} />{refreshing ? 'Refreshing…' : 'Refresh'}</Button></div>
+      <TemperatureHistory readings={readings.data} pending={readings.isFetching && !readings.data} error={readings.isError} />
+      <div className="flex items-end justify-between gap-3 border-t border-border pt-3"><span className="text-xs font-medium text-muted-foreground">Latest temp</span><strong className="text-2xl font-bold tracking-[-.035em] tabular-nums">{latest ? `${latest.temperatureC.toFixed(1)}°C` : '—'}</strong></div>
       <dl className="grid gap-2 rounded-lg bg-muted/60 p-3">{[['Provisioning', labels[resource.provisioningStatus]], ['Assignment', resource.assignment?.batchCode ?? 'Unassigned'], ['Last seen', resource.lastSeenAt ? new Date(resource.lastSeenAt).toLocaleString() : 'Never']].map(([label, value]) => <div className="flex items-center justify-between gap-3 text-xs" key={label}><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 truncate font-semibold text-foreground" title={value}>{value}</dd></div>)}</dl>
       <ResourceActions><Button variant="secondary" size="sm" type="button" onClick={onAssignment} disabled={resource.provisioningStatus !== 'PROVISIONED'}><Unplug />{resource.assignment ? 'End assignment' : 'Assign sensor'}</Button><Button variant="destructive-outline" size="sm" type="button" onClick={onDelete}><Trash2 />Delete</Button></ResourceActions>
     </article>
   )
+}
+
+function TemperatureHistory({ readings, pending, error }) {
+  if (pending) return <div className="h-28 animate-pulse rounded-lg bg-muted" role="status"><span className="sr-only">Loading temperature history</span></div>
+  if (error) return <div className="grid h-28 place-items-center rounded-lg bg-red-50 px-4 text-center text-xs font-medium text-red-700" role="status">Temperature history unavailable</div>
+  if (!readings?.length) return <div className="grid h-28 place-items-center rounded-lg bg-muted/60 px-4 text-center text-xs text-muted-foreground">No assigned readings yet</div>
+
+  const width = 300
+  const height = 92
+  const padding = 8
+  const temperatures = readings.map(({ temperatureC }) => temperatureC)
+  const minimum = Math.min(...temperatures)
+  const maximum = Math.max(...temperatures)
+  const range = maximum - minimum || 1
+  const firstTime = Date.parse(readings[0].measuredAt)
+  const lastTime = Date.parse(readings.at(-1).measuredAt)
+  const timeRange = lastTime - firstTime
+  const points = readings.map((reading, index) => {
+    const x = padding + (width - padding * 2) * (timeRange ? (Date.parse(reading.measuredAt) - firstTime) / timeRange : readings.length === 1 ? 0.5 : index / (readings.length - 1))
+    const y = maximum === minimum ? height / 2 : padding + (height - padding * 2) * (1 - (reading.temperatureC - minimum) / range)
+    return `${x},${y}`
+  }).join(' ')
+  const time = (value) => new Date(value).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+  return <figure className="rounded-lg bg-muted/60 px-3 pt-3 pb-2">
+    <svg className="h-23 w-full overflow-visible" viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none" role="img" aria-label={`${readings.length} temperature readings from ${minimum.toFixed(1)} to ${maximum.toFixed(1)} degrees Celsius`}>
+      <title>Temperature history</title>
+      <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} stroke="currentColor" className="text-border" strokeDasharray="3 4" vectorEffect="non-scaling-stroke" />
+      {readings.length === 1 ? <circle cx={width / 2} cy={height / 2} r="3.5" className="fill-primary" vectorEffect="non-scaling-stroke" /> : <polyline points={points} fill="none" className="stroke-primary" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" vectorEffect="non-scaling-stroke" />}
+    </svg>
+    <figcaption className="mt-1 flex justify-between text-[10px] font-medium tabular-nums text-muted-foreground"><span>{time(readings[0].measuredAt)}</span><span>{time(readings.at(-1).measuredAt)}</span></figcaption>
+  </figure>
 }
 
 export function ResourcesPage() {
