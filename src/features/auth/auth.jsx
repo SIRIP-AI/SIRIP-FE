@@ -3,12 +3,24 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 
 import { AppShell } from '@/components/app-shell.jsx'
+import { Button } from '@/components/ui/button.jsx'
+import { Input } from '@/components/ui/input.jsx'
+import { Label } from '@/components/ui/label.jsx'
 import { authError, login, loginInputSchema, logout, sessionQueryOptions, signup, signupInputSchema } from '@/features/auth/auth-api.js'
 
 const seededAccount = { email: 'adi.rahman@sirip.id', password: 'SiripDemo2026!' }
 
 function clearAccountData(queryClient) {
   queryClient.removeQueries({ predicate: ({ queryKey }) => queryKey[0] !== 'auth' })
+}
+
+function AuthField({ label, name, error, ...props }) {
+  const errorId = `${name}-error`
+  return <div className="grid gap-2">
+    <Label className="text-xs font-semibold text-slate-600" htmlFor={name}>{label}</Label>
+    <Input className="h-11 bg-white px-3" id={name} name={name} aria-invalid={Boolean(error)} aria-describedby={error ? errorId : undefined} {...props} />
+    {error && <span className="text-xs text-red-700" id={errorId}>{error}</span>}
+  </div>
 }
 
 export function AuthenticatedApp() {
@@ -25,8 +37,8 @@ export function AuthenticatedApp() {
     },
   })
 
-  if (session.isPending) return <main className="auth-state">Loading session…</main>
-  if (session.isError) return <main className="auth-state" role="alert">Unable to verify your session.</main>
+  if (session.isPending) return <main className="grid min-h-screen place-items-center text-sm text-muted-foreground">Loading session…</main>
+  if (session.isError) return <main className="grid min-h-screen place-items-center text-sm text-muted-foreground" role="alert">Unable to verify your session.</main>
   if (!session.data) return <Navigate to="/login" state={{ from: location }} replace />
 
   return <AppShell user={session.data} onLogout={() => logoutMutation.mutate()} logoutPending={logoutMutation.isPending} />
@@ -70,18 +82,18 @@ export function LoginPage() {
   }
 
   return (
-    <main className="login-page">
-      <section className="login-card" aria-labelledby="login-title">
-        <img className="login-logo" src="/logo/sirip-color.png" alt="SIRIP" />
-        <div className="login-heading"><span>Cold-chain operations</span><h1 id="login-title">Sign in to SIRIP</h1></div>
-        <div className="seeded-account"><div><strong>Demo operator</strong><span>{seededAccount.email}</span></div><button type="button" onClick={autofillSeededAccount}>Use seeded account</button></div>
-        <form ref={formRef} className="login-form" onSubmit={submit}>
-          <label>Email<input name="email" type="email" autoComplete="username" autoFocus aria-invalid={Boolean(errors.email)} />{errors.email && <span>{errors.email}</span>}</label>
-          <label>Password<input name="password" type="password" autoComplete="current-password" aria-invalid={Boolean(errors.password)} />{errors.password && <span>{errors.password}</span>}</label>
-          {mutation.isError && <p className="form-error" role="alert">{authError(mutation.error)}</p>}
-          <button className="button button-primary login-submit" type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Signing in…' : 'Sign in'}</button>
+    <main className="grid min-h-screen place-items-center bg-[linear-gradient(145deg,#eff6ff,var(--background)_48%,#f0fdf4)] p-6 max-[560px]:p-2.5">
+      <section className="w-full max-w-[430px] rounded-[14px] border border-border bg-white/95 p-[34px] shadow-[0_24px_70px_rgb(2_40_88_/_12%)] max-[560px]:p-5" aria-labelledby="login-title">
+        <img className="block h-auto w-[126px]" src="/logo/sirip-color.png" alt="SIRIP" />
+        <div className="mt-[34px] mb-6 max-[560px]:mt-7"><span className="text-[10px] font-bold tracking-[.08em] text-brand uppercase">Cold-chain operations</span><h1 className="mt-[7px] text-[28px] font-bold tracking-[-.04em]" id="login-title">Sign in to SIRIP</h1></div>
+        <div className="mb-[19px] flex items-center justify-between gap-3 rounded-lg border border-blue-200 bg-blue-50 p-3"><div><strong className="block text-xs">Demo operator</strong><span className="mt-[3px] block text-[10px] text-muted-foreground">{seededAccount.email}</span></div><Button className="h-auto shrink-0 px-0 text-[10px]" variant="link" type="button" onClick={autofillSeededAccount}>Use seeded account</Button></div>
+        <form ref={formRef} className="grid gap-[17px]" onSubmit={submit}>
+          <AuthField label="Email" name="email" error={errors.email} type="email" autoComplete="username" autoFocus />
+          <AuthField label="Password" name="password" error={errors.password} type="password" autoComplete="current-password" />
+          {mutation.isError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">{authError(mutation.error)}</p>}
+          <Button className="mt-0.5 h-11 w-full" type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Signing in…' : 'Sign in'}</Button>
         </form>
-        <p className="auth-switch">Don't have an account? <Link to="/signup">Sign up</Link></p>
+        <p className="mt-[22px] text-center text-xs text-muted-foreground">Don't have an account? <Link className="font-bold text-primary hover:underline" to="/signup">Sign up</Link></p>
       </section>
     </main>
   )
@@ -122,20 +134,20 @@ export function SignupPage() {
   }
 
   return (
-    <main className="login-page">
-      <section className="login-card" aria-labelledby="signup-title">
-        <img className="login-logo" src="/logo/sirip-color.png" alt="SIRIP" />
-        <div className="login-heading"><span>Operator account</span><h1 id="signup-title">Create your account</h1><p>Register as a cold-chain operations coordinator.</p></div>
-        <form className="login-form" onSubmit={submit}>
-          <label>Full name<input name="name" autoComplete="name" autoFocus aria-invalid={Boolean(errors.name)} />{errors.name && <span>{errors.name}</span>}</label>
-          <label>Email<input name="email" type="email" autoComplete="username" aria-invalid={Boolean(errors.email)} />{errors.email && <span>{errors.email}</span>}</label>
-          <label>WhatsApp phone<input name="phone" type="tel" autoComplete="tel" placeholder="+6281234567890" aria-invalid={Boolean(errors.phone)} />{errors.phone && <span>{errors.phone}</span>}</label>
-          <label>Password<input name="password" type="password" autoComplete="new-password" aria-invalid={Boolean(errors.password)} />{errors.password && <span>{errors.password}</span>}</label>
-          <label>Confirm password<input name="confirmPassword" type="password" autoComplete="new-password" aria-invalid={Boolean(errors.confirmPassword)} />{errors.confirmPassword && <span>{errors.confirmPassword}</span>}</label>
-          {mutation.isError && <p className="form-error" role="alert">{authError(mutation.error)}</p>}
-          <button className="button button-primary login-submit" type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Creating account…' : 'Create account'}</button>
+    <main className="grid min-h-screen place-items-center bg-[linear-gradient(145deg,#eff6ff,var(--background)_48%,#f0fdf4)] p-6 max-[560px]:p-2.5">
+      <section className="my-6 w-full max-w-[430px] rounded-[14px] border border-border bg-white/95 p-[34px] shadow-[0_24px_70px_rgb(2_40_88_/_12%)] max-[560px]:my-0 max-[560px]:p-5" aria-labelledby="signup-title">
+        <img className="block h-auto w-[126px]" src="/logo/sirip-color.png" alt="SIRIP" />
+        <div className="mt-[34px] mb-6 max-[560px]:mt-7"><span className="text-[10px] font-bold tracking-[.08em] text-brand uppercase">Operator account</span><h1 className="mt-[7px] text-[28px] font-bold tracking-[-.04em]" id="signup-title">Create your account</h1><p className="mt-[9px] text-sm leading-relaxed text-muted-foreground">Register as a cold-chain operations coordinator.</p></div>
+        <form className="grid gap-[17px]" onSubmit={submit}>
+          <AuthField label="Full name" name="name" error={errors.name} autoComplete="name" autoFocus />
+          <AuthField label="Email" name="email" error={errors.email} type="email" autoComplete="username" />
+          <AuthField label="WhatsApp phone" name="phone" error={errors.phone} type="tel" autoComplete="tel" placeholder="+6281234567890" />
+          <AuthField label="Password" name="password" error={errors.password} type="password" autoComplete="new-password" />
+          <AuthField label="Confirm password" name="confirmPassword" error={errors.confirmPassword} type="password" autoComplete="new-password" />
+          {mutation.isError && <p className="rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-700" role="alert">{authError(mutation.error)}</p>}
+          <Button className="mt-0.5 h-11 w-full" type="submit" disabled={mutation.isPending}>{mutation.isPending ? 'Creating account…' : 'Create account'}</Button>
         </form>
-        <p className="auth-switch">Already have an account? <Link to="/login">Sign in</Link></p>
+        <p className="mt-[22px] text-center text-xs text-muted-foreground">Already have an account? <Link className="font-bold text-primary hover:underline" to="/login">Sign in</Link></p>
       </section>
     </main>
   )
