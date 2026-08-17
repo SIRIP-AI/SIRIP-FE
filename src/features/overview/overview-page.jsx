@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 
 import { Appear } from '@/components/appear.jsx'
 import { overviewQueryOptions } from '@/features/overview/overview-api.js'
+import { getWhatsAppUrl } from '@/lib/whatsapp.js'
 
 const qualityPresentation = {
   NORMAL: { label: 'Normal', tone: 'healthy' },
@@ -101,6 +102,7 @@ export function OverviewPage() {
                   </li>
                 ))}
               </ol>
+              <Link className="button button-secondary w-full" to="/plans">View full plan</Link>
             </>
           ) : <div className="overview-empty"><strong>No active plan</strong><span>Approved plans will appear here.</span></div>}
         </Appear>
@@ -111,7 +113,7 @@ export function OverviewPage() {
           <AlertTriangle size={20} aria-hidden="true" />
           <div><strong>{alert.title}</strong><span>{alert.description} · {new Date(alert.occurredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
           <StatusBadge tone={alert.severity === 'CRITICAL' ? 'critical' : 'warning'}>{alert.severity === 'CRITICAL' ? 'Critical' : 'Warning'}</StatusBadge>
-          <a className="button button-primary" href="https://wa.me/" target="_blank" rel="noreferrer"><MessageCircle size={17} />Open WhatsApp</a>
+          {getWhatsAppUrl(`Hello SIRIP, I need help with alert "${alert.title}" (ID ${alert.id}).`) ? <a className="button button-primary" href={getWhatsAppUrl(`Hello SIRIP, I need help with alert "${alert.title}" (ID ${alert.id}).`)} target="_blank" rel="noreferrer"><MessageCircle size={17} />Open WhatsApp</a> : <button className="button button-primary" type="button" disabled title="Set VITE_WHATSAPP_URL to enable WhatsApp."><MessageCircle size={17} />Open WhatsApp</button>}
         </Appear>
       )) : <div className="overview-clear"><strong>No active alerts</strong><span>Operations currently require no exception response.</span></div>}
 

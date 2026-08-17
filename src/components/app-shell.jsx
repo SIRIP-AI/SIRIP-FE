@@ -14,6 +14,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button.jsx'
 import { cn } from '@/lib/utils.js'
+import { getWhatsAppUrl } from '@/lib/whatsapp.js'
 
 const navigation = [
   { label: 'Overview', icon: LayoutDashboard, path: '/' },
@@ -65,6 +66,7 @@ export function AppShell({ user, onLogout, logoutPending }) {
   const sidebarWasOpen = useRef(false)
   const location = useLocation()
   const title = navigation.find(({ path }) => path === location.pathname)?.label ?? 'SIRIP'
+  const whatsappUrl = getWhatsAppUrl(`Hello SIRIP, I need help with ${title.toLowerCase()}.`)
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 780px)')
@@ -138,7 +140,7 @@ export function AppShell({ user, onLogout, logoutPending }) {
         <header className="hidden max-[780px]:sticky max-[780px]:top-0 max-[780px]:z-20 max-[780px]:flex max-[780px]:h-[62px] max-[780px]:items-center max-[780px]:justify-between max-[780px]:border-b max-[780px]:border-border max-[780px]:bg-white/95 max-[780px]:px-4 max-[780px]:backdrop-blur-[10px]">
           <Button ref={menuButtonRef} variant="outline" size="icon" type="button" onClick={() => setSidebarOpen(true)} aria-label="Open sidebar" aria-expanded={sidebarOpen}><Menu size={20} /></Button>
           <strong className="text-sm">{title}</strong>
-          <Button variant="outline" size="icon" asChild><a href="https://wa.me/" target="_blank" rel="noreferrer" aria-label="Open WhatsApp"><MessageCircle size={19} /></a></Button>
+          {whatsappUrl ? <Button variant="outline" size="icon" asChild><a href={whatsappUrl} target="_blank" rel="noreferrer" aria-label="Open WhatsApp"><MessageCircle size={19} /></a></Button> : <Button variant="outline" size="icon" type="button" disabled title="Set VITE_WHATSAPP_URL to enable WhatsApp." aria-label="WhatsApp unavailable"><MessageCircle size={19} /></Button>}
         </header>
         <Outlet />
       </main>
