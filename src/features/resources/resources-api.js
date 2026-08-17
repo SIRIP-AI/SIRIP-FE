@@ -104,6 +104,17 @@ export async function deleteResource(type, id) {
 
 const batchOptionSchema = z.object({ id: z.string(), code: z.string(), weightKg: z.number(), grade: z.string() })
 
+const readinessSchema = z.object({
+  ready: z.boolean(),
+  completedSteps: z.number().int(),
+  totalSteps: z.number().int(),
+  steps: z.array(z.object({ key: z.string(), label: z.string(), complete: z.boolean(), count: z.number().int() })),
+})
+
+export async function getSetupReadiness() {
+  return readinessSchema.parse((await api.get('/api/setup-readiness')).data)
+}
+
 export async function listSensorAssignmentOptions() {
   return z.array(batchOptionSchema).parse((await api.get('/api/sensor-assignment-options')).data)
 }

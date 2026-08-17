@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Boxes,
-  Ship,
   Blocks,
+  Boxes,
+  LayoutDashboard,
+  LogOut,
   Menu,
   MessageCircle,
   Route,
+  Ship,
   X,
 } from 'lucide-react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
@@ -14,13 +16,18 @@ import { Button } from '@/components/ui/button.jsx'
 import { cn } from '@/lib/utils.js'
 
 const navigation = [
+  { label: 'Overview', icon: LayoutDashboard, path: '/' },
   { label: 'Resources', icon: Blocks, path: '/resources' },
   { label: 'Fishing Trips', icon: Ship, path: '/fishing-trips' },
   { label: 'Batches', icon: Boxes, path: '/batches' },
   { label: 'Plans', icon: Route, path: '/plans' },
 ]
 
-function Sidebar({ isMobile, open, closeButtonRef, onClose }) {
+function initials(name) {
+  return name.split(/\s+/).map((part) => part[0]).join('').slice(0, 2).toUpperCase()
+}
+
+function Sidebar({ isMobile, open, closeButtonRef, onClose, user, onLogout, logoutPending }) {
   return (
     <aside
       className={cn('fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-border bg-card px-4 pt-6 pb-[18px] max-[780px]:w-[min(86vw,300px)] max-[780px]:-translate-x-[102%] max-[780px]:shadow-[18px_0_55px_rgb(2_40_88_/_16%)] max-[780px]:transition-transform max-[780px]:duration-[250ms]', open && 'max-[780px]:translate-x-0')}
@@ -34,24 +41,23 @@ function Sidebar({ isMobile, open, closeButtonRef, onClose }) {
       </div>
 
       <nav className="flex flex-col gap-1">
-        {navigation.map(({ label, icon: Icon, path }) => path ? (
+        {navigation.map(({ label, icon: Icon, path }) => (
           <NavLink key={label} className={({ isActive }) => cn('flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-[520] text-slate-600 no-underline transition-colors hover:bg-slate-100 hover:text-foreground', isActive && 'bg-primary/10 text-primary')} end={path === '/'} to={path} onClick={onClose}>
             <Icon size={19} />{label}
           </NavLink>
-        ) : (
-          <span key={label} className="flex min-h-11 cursor-not-allowed items-center gap-3 rounded-lg px-3 text-sm font-[520] text-slate-600 opacity-[.58]" aria-disabled="true"><Icon size={19} />{label}</span>
         ))}
       </nav>
 
       <div className="mt-auto flex items-center gap-2.5 border-t border-border px-2 pt-3">
-        <span className="grid size-[34px] shrink-0 place-items-center rounded-full bg-foreground text-[11px] font-bold text-white">AR</span>
-        <div><strong className="block text-xs">Adi Rahman</strong><span className="mt-0.5 block text-[11px] text-muted-foreground">Operations coordinator</span></div>
+        <span className="grid size-[34px] shrink-0 place-items-center rounded-full bg-foreground text-[11px] font-bold text-white">{initials(user.name)}</span>
+        <div className="min-w-0"><strong className="block truncate text-xs">{user.name}</strong><span className="mt-0.5 block text-[11px] text-muted-foreground">Operations coordinator</span></div>
+        <Button className="ml-auto shrink-0" variant="ghost" size="icon-sm" type="button" onClick={onLogout} disabled={logoutPending} aria-label="Sign out"><LogOut size={16} /></Button>
       </div>
     </aside>
   )
 }
 
-export function AppShell() {
+export function AppShell({ user, onLogout, logoutPending }) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [isMobile, setIsMobile] = useState(() => window.matchMedia('(max-width: 780px)').matches)
   const closeButtonRef = useRef(null)
@@ -125,7 +131,7 @@ export function AppShell() {
 
   return (
     <div className="min-h-screen">
-      <Sidebar isMobile={isMobile} open={sidebarOpen} closeButtonRef={closeButtonRef} onClose={() => setSidebarOpen(false)} />
+      <Sidebar isMobile={isMobile} open={sidebarOpen} closeButtonRef={closeButtonRef} onClose={() => setSidebarOpen(false)} user={user} onLogout={onLogout} logoutPending={logoutPending} />
       {sidebarOpen && <button className="fixed inset-0 z-30 hidden h-full w-full border-0 bg-foreground/40 p-0 max-[780px]:block" type="button" aria-label="Close sidebar" onClick={() => setSidebarOpen(false)} />}
 
       <main className="ml-60 min-h-screen max-[780px]:ml-0" inert={isMobile && sidebarOpen ? true : undefined}>

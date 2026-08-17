@@ -1,0 +1,64 @@
+import { z } from 'zod'
+
+import { api } from '@/lib/axios.js'
+
+export const loginInputSchema = z.object({
+  email: z.email('Enter a valid email address'),
+  password: z.string().min(1, 'Password is required'),
+})
+
+export const signupInputSchema = z.object({
+  name: z.string().trim().min(1, 'Name is required').max(100),
+  email: z.email('Enter a valid email address'),
+  phone: z.string().trim().regex(/^\+?[0-9][0-9 ()-]{6,19}$/, 'Enter a valid phone number'),
+  password: z.string().min(8, 'Password must be at least 8 characters').max(200),
+  confirmPassword: z.string(),
+}).refine((value) => value.password === value.confirmPassword, {
+  message: 'Passwords do not match',
+  path: ['confirmPassword'],
+})
+
+const userSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  email: z.email(),
+  phone: z.string(),
+})
+
+const authResponseSchema = z.object({ user: userSchema })
+
+export const sessionQueryOptions = {
+  queryKey: ['auth', 'session'],
+  queryFn: async () => {
+    try {
+      return authResponseSchema.parse((await api.get('/api/auth/session')).data).user
+    } catch (error) {
+      if (error.response?.status === 401) return null
+      throw error
+    }
+  },
+  retry: false,
+  staleTime: 5 * 60 * 1000,
+}
+
+export async function login(credentials) {
+  return authResponseSchema.parse((await api.post('/api/auth/login', loginInputSchema.parse(credentials))).data).user
+}
+
+export async function signup(input) {
+  const registration = signupInputSchema.parse(input)
+  return authResponseSchema.parse((await api.post('/api/auth/signup', {
+    name: registration.name,
+    email: registration.email,
+    phone: registration.phone,
+    password: registration.password,
+  })).data).user
+}
+
+export async function logout() {
+  await api.delete('/api/auth/session')
+}
+
+export function authError(error) {
+  return error.response?.data?.error ?? error.message ?? 'Unable to sign in'
+}

@@ -21,6 +21,7 @@ import {
   destinationInputSchema,
   destinationStatuses,
   getSensorDiagnostics,
+  getSetupReadiness,
   listResources,
   listSensorAssignmentOptions,
   saveResource,
@@ -102,7 +103,10 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
   const mutation = useMutation({
     mutationFn: (input) => saveResource(type, { ...input, id: resource?.id }),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['resources', type] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['resources', type] }),
+        queryClient.invalidateQueries({ queryKey: ['resources', 'readiness'] }),
+      ])
       onComplete(resource ? 'Resource updated' : 'Resource added')
       onClose()
     },
@@ -322,7 +326,10 @@ function DeleteDialog({ resource, type, onClose, onComplete }) {
   const mutation = useMutation({
     mutationFn: () => deleteResource(type, resource.id),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['resources', type] })
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['resources', type] }),
+        queryClient.invalidateQueries({ queryKey: ['resources', 'readiness'] }),
+      ])
       onComplete('Resource deleted')
       onClose()
     },
@@ -361,6 +368,8 @@ export function ResourcesPage() {
   const noticeTimer = useRef()
   const dialogTrigger = useRef(null)
   const query = useQuery({ queryKey: ['resources', type], queryFn: () => listResources(type) })
+  const readiness = useQuery({ queryKey: ['resources', 'readiness'], queryFn: getSetupReadiness })
+  const tabByReadinessKey = { coldStorages: 'cold-storages', vehicles: 'vehicles', destinations: 'destinations', sensors: 'sensors' }
   const isColdStorage = type === 'cold-storages'
   const isVehicle = type === 'vehicles'
   const isDestination = type === 'destinations'
@@ -398,6 +407,8 @@ export function ResourcesPage() {
   return (
     <div className="mx-auto w-full max-w-[1180px] px-8 pt-12 pb-7 max-[780px]:px-4 max-[780px]:py-6">
       <PageHeader title="Resources" description="Manage the operational resources SIRIP is allowed to use." action={<Button type="button" onClick={(event) => openDialog(undefined, event.currentTarget)}><Plus />Add {resourceLabel}</Button>} />
+
+      {readiness.isSuccess && !readiness.data.ready && <section className="mb-4 rounded-xl border border-blue-200 bg-blue-50 p-4" aria-label="Setup progress"><div className="flex items-center justify-between gap-4 max-[560px]:items-stretch max-[560px]:flex-col"><div><span className="text-[10px] font-bold tracking-[.08em] text-primary uppercase">Setup progress</span><strong className="mt-1 block text-sm">{readiness.data.completedSteps} of {readiness.data.totalSteps} complete</strong></div><div className="h-2 w-full max-w-70 overflow-hidden rounded-full bg-primary/15 max-[560px]:max-w-none" role="progressbar" aria-label="Setup progress" aria-valuemin="0" aria-valuemax={readiness.data.totalSteps} aria-valuenow={readiness.data.completedSteps}><span className="block h-full rounded-full bg-primary" style={{ width: `${readiness.data.completedSteps / readiness.data.totalSteps * 100}%` }} /></div></div><div className="mt-3 grid grid-cols-4 gap-2 max-[900px]:grid-cols-2 max-[640px]:grid-cols-1">{readiness.data.steps.map((step) => <Button key={step.key} className="justify-start bg-white" variant="outline" size="sm" type="button" onClick={() => setType(tabByReadinessKey[step.key])}><span className={cn('grid size-5 place-items-center rounded-full text-[10px]', step.complete ? 'bg-green-600 text-white' : 'bg-primary/10 text-primary')}>{step.complete ? <Check size={13} /> : step.count}</span>{step.label}</Button>)}</div></section>}
 
       <Tabs value={type} onValueChange={setType}>
         <div className="mb-5 overflow-x-auto rounded-xl border border-border bg-card p-1">
