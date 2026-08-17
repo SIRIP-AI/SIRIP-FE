@@ -64,7 +64,7 @@ export function AppShell({ user, onLogout, logoutPending }) {
   const menuButtonRef = useRef(null)
   const sidebarWasOpen = useRef(false)
   const location = useLocation()
-  const title = navigation.find(({ path }) => path === location.pathname)?.label ?? 'SIRIP'
+  const title = location.pathname === '/resources' ? 'Resources' : location.pathname === '/fishing-trips' ? 'Fishing Trips' : location.pathname === '/batches' ? 'Batches' : location.pathname.startsWith('/plans') ? 'Plans' : 'SIRIP'
 
   useEffect(() => {
     const media = window.matchMedia('(max-width: 780px)')

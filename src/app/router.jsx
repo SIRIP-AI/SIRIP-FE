@@ -4,7 +4,7 @@ import { AuthenticatedApp, LoginPage, SignupPage } from '@/features/auth/auth.js
 import { BatchesPage } from '@/features/batches/batches-page.jsx'
 import { FishingTripsPage } from '@/features/batches/fishing-trips-page.jsx'
 import { OverviewPage } from '@/features/overview/overview-page.jsx'
-import { PlansPage } from '@/features/plans/plans-page.jsx'
+import { PlanDetailsPage, PlansLayout, PlansPage } from '@/features/plans/plans-page.jsx'
 import { ResourcesPage } from '@/features/resources/resources-page.jsx'
 
 export function AppRouter() {
@@ -17,7 +17,10 @@ export function AppRouter() {
         <Route path="setup" element={<Navigate replace to="/resources" />} />
         <Route path="batches" element={<BatchesPage />} />
         <Route path="fishing-trips" element={<FishingTripsPage />} />
-        <Route path="plans" element={<PlansPage />} />
+        <Route path="plans" element={<PlansLayout />}>
+          <Route index element={<PlansPage />} />
+          <Route path=":planId" element={<PlanDetailsPage />} />
+        </Route>
         <Route path="resources" element={<ResourcesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
