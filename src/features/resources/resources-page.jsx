@@ -105,6 +105,8 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['resources', type] }),
         queryClient.invalidateQueries({ queryKey: ['resources', 'readiness'] }),
+        queryClient.invalidateQueries({ queryKey: ['overview'] }),
+        queryClient.invalidateQueries({ queryKey: ['plans'] }),
       ])
       onComplete(resource ? 'Resource updated' : 'Resource added')
       onClose()
@@ -435,6 +437,8 @@ function AssignmentDialog({ sensor, onClose, onComplete }) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['resources', 'sensors'] }),
         queryClient.invalidateQueries({ queryKey: ['resources', 'sensor-assignment-options'] }),
+        queryClient.invalidateQueries({ queryKey: ['batches'] }),
+        queryClient.invalidateQueries({ queryKey: ['overview'] }),
       ])
       onComplete(sensor.assignment ? 'Sensor assignment ended' : 'Sensor assigned')
       onClose()
@@ -470,6 +474,8 @@ function DeleteDialog({ resource, type, onClose, onComplete }) {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: ['resources', type] }),
         queryClient.invalidateQueries({ queryKey: ['resources', 'readiness'] }),
+        queryClient.invalidateQueries({ queryKey: ['overview'] }),
+        queryClient.invalidateQueries({ queryKey: ['plans'] }),
       ])
       onComplete('Resource deleted')
       onClose()
@@ -514,10 +520,11 @@ function SensorCard({ resource, onDelete, onAssignment }) {
     <article className={cardClass} data-animate-card>
       <div className="flex items-center justify-between gap-3"><ResourceIcon><Cpu size={20} /></ResourceIcon><ResourceStatusBadge status={resource.connectivityStatus} /></div>
       <div><h3 className="text-lg font-bold tracking-[-.025em]">{resource.code}</h3><p className="mt-1.5 text-xs text-muted-foreground">{resource.deviceUid}</p></div>
-      <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-foreground">Temperature history</span><Button variant="outline" size="sm" type="button" onClick={refresh} disabled={refreshing || resource.provisioningStatus !== 'PROVISIONED'}><RefreshCw className={refreshing ? 'animate-spin' : ''} />{refreshing ? 'Refreshing…' : 'Refresh'}</Button></div>
+      <div className="flex items-center justify-between gap-3"><span className="text-xs font-semibold text-foreground">Latest 100 stored readings</span><Button variant="outline" size="sm" type="button" onClick={refresh} disabled={refreshing || resource.provisioningStatus !== 'PROVISIONED'}><RefreshCw className={refreshing ? 'animate-spin' : ''} />{refreshing ? 'Refreshing…' : 'Refresh'}</Button></div>
       <TemperatureHistory readings={readings.data} pending={readings.isFetching && !readings.data} error={readings.isError} />
+      {resource.connectivityStatus === 'OFFLINE' && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Sensor offline — local recording may continue.</p>}
       <div className="flex items-end justify-between gap-3 border-t border-border pt-3"><span className="text-xs font-medium text-muted-foreground">Latest temp</span><strong className="text-2xl font-bold tracking-[-.035em] tabular-nums">{latest ? `${latest.temperatureC.toFixed(1)}°C` : '—'}</strong></div>
-      <dl className="grid gap-2 rounded-lg bg-muted/60 p-3">{[['Provisioning', labels[resource.provisioningStatus]], ['Assignment', resource.assignment?.batchCode ?? 'Unassigned'], ['Last seen', resource.lastSeenAt ? new Date(resource.lastSeenAt).toLocaleString() : 'Never']].map(([label, value]) => <div className="flex items-center justify-between gap-3 text-xs" key={label}><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 truncate font-semibold text-foreground" title={value}>{value}</dd></div>)}</dl>
+      <dl className="grid gap-2 rounded-lg bg-muted/60 p-3">{[['Provisioning', labels[resource.provisioningStatus]], ['Assignment', resource.assignment?.batchCode ?? 'Unassigned'], ['Latest measured', latest ? new Date(latest.measuredAt).toLocaleString() : 'Never'], ['Latest upload', latest ? new Date(latest.receivedAt).toLocaleString() : resource.assignment?.lastSyncedAt ? new Date(resource.assignment.lastSyncedAt).toLocaleString() : 'Never'], ['Last seen', resource.lastSeenAt ? new Date(resource.lastSeenAt).toLocaleString() : 'Never']].map(([label, value]) => <div className="flex items-center justify-between gap-3 text-xs" key={label}><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 truncate font-semibold text-foreground" title={value}>{value}</dd></div>)}</dl>
       <ResourceActions><Button variant="secondary" size="sm" type="button" onClick={onAssignment} disabled={resource.provisioningStatus !== 'PROVISIONED'}><Unplug />{resource.assignment ? 'End assignment' : 'Assign sensor'}</Button><Button variant="destructive-outline" size="sm" type="button" onClick={onDelete}><Trash2 />Delete</Button></ResourceActions>
     </article>
   )

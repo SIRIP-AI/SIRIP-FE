@@ -38,6 +38,14 @@ function freshness(updatedAt) {
   return seconds < 60 ? `${seconds} sec ago` : `${Math.floor(seconds / 60)} min ago`
 }
 
+function snapshotStatus(updatedAt, refetchFailed) {
+  const age = Date.now() - new Date(updatedAt).getTime()
+  if (refetchFailed) return { label: 'Refresh failed', dot: 'bg-amber-500 shadow-[0_0_0_4px_rgb(245_158_11_/_12%)]' }
+  if (age < -30_000) return { label: 'Clock skew', dot: 'bg-amber-500 shadow-[0_0_0_4px_rgb(245_158_11_/_12%)]' }
+  if (age > 90_000) return { label: 'Stale', dot: 'bg-amber-500 shadow-[0_0_0_4px_rgb(245_158_11_/_12%)]' }
+  return { label: 'Live', dot: 'bg-green-600 shadow-[0_0_0_4px_rgb(22_163_74_/_12%)]' }
+}
+
 function stepAction(step) {
   return `${actions[step.actionType]} ${step.batchCode}${step.resource ? ` ${step.actionType === 'DISPATCH' ? 'to' : step.actionType === 'LOAD' ? 'into' : 'in'} ${step.resource}` : ''}`
 }
@@ -55,12 +63,13 @@ export function OverviewPage() {
 
   const { activePlan, alerts, priorityBatches, summary, updatedAt } = overview.data
   const nextStepId = activePlan?.steps.find((step) => step.status === 'UPCOMING')?.id
+  const snapshot = snapshotStatus(updatedAt, overview.isRefetchError)
 
   return (
     <div className="mx-auto w-full max-w-[1180px] px-8 pt-12 pb-7 max-[780px]:px-4 max-[780px]:py-6" id="overview">
       <div className="mb-6 flex items-end justify-between gap-5 max-[780px]:mb-[18px]">
         <div><h1 className="text-3xl font-bold tracking-[-.04em] max-[780px]:sr-only">Overview</h1><p className="mt-[7px] text-sm text-muted-foreground max-[780px]:mt-0">{new Intl.DateTimeFormat('en', { weekday: 'long', day: 'numeric', month: 'long' }).format(new Date())}</p></div>
-        <div className="flex shrink-0 items-center gap-[7px] text-xs text-muted-foreground max-[560px]:text-[11px]"><span className="size-[7px] rounded-full bg-green-600 shadow-[0_0_0_4px_rgb(22_163_74_/_12%)]" />Live · {freshness(updatedAt)}</div>
+        <div className="flex shrink-0 items-center gap-[7px] text-xs text-muted-foreground max-[560px]:text-[11px]" role="status"><span className={cn('size-[7px] rounded-full', snapshot.dot)} aria-hidden="true" />{snapshot.label} · {freshness(updatedAt)}</div>
       </div>
 
       <Appear as="section" className="grid grid-cols-4 overflow-hidden rounded-xl border border-border bg-card max-[780px]:grid-cols-2" aria-label="Operation summary">
