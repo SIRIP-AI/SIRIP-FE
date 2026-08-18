@@ -43,7 +43,7 @@ function stepAction(step) {
 }
 
 function AlertWhatsAppButton({ alert }) {
-  const url = getWhatsAppUrl(`Hello SIRIP, I need help with alert "${alert.title}" (ID ${alert.id}).`)
+  const url = getWhatsAppUrl(`Hello SIRIP, I need help with alert "${alert.title}" (${alert.source} event, ID ${alert.id}).`)
   return url ? <Button className="max-[780px]:col-span-full max-[780px]:w-full" asChild><a href={url} target="_blank" rel="noreferrer"><MessageCircle size={17} />Open WhatsApp</a></Button> : <Button className="max-[780px]:col-span-full max-[780px]:w-full" type="button" disabled title="Set VITE_WHATSAPP_URL to enable WhatsApp."><MessageCircle size={17} />Open WhatsApp</Button>
 }
 
@@ -117,7 +117,7 @@ export function OverviewPage() {
       {alerts.length ? alerts.map((alert, index) => (
         <Appear as="section" className="mt-3 grid grid-cols-[auto_1fr_auto_auto] items-center gap-3.5 rounded-xl border border-red-200 bg-card px-[18px] py-4 text-red-600 max-[780px]:grid-cols-[auto_1fr_auto] max-[560px]:grid-cols-[auto_1fr] max-[560px]:items-start" delay={0.2 + index * 0.03} key={alert.id}>
           <AlertTriangle className="self-center" size={20} aria-hidden="true" />
-          <div className="text-foreground"><strong className="block text-sm">{alert.title}</strong><span className="mt-1 block text-xs text-muted-foreground">{alert.description} · {new Date(alert.occurredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+          <div className="text-foreground"><strong className="block text-sm">{alert.title}</strong><span className="mt-1 block text-xs text-muted-foreground">{alert.description} · {alert.source.toLowerCase()} · ID {alert.id} · {new Date(alert.occurredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
           <StatusBadge className="max-[560px]:col-start-2" tone={alert.severity === 'CRITICAL' ? 'critical' : 'warning'}>{alert.severity === 'CRITICAL' ? 'Critical' : 'Warning'}</StatusBadge>
           <AlertWhatsAppButton alert={alert} />
         </Appear>

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { api } from '@/lib/axios.js'
+import { sortEvents, sortPlanSteps } from '@/lib/ordering.js'
 
 const overviewSchema = z.object({
   updatedAt: z.string().datetime(),
@@ -39,6 +40,7 @@ const overviewSchema = z.object({
     id: z.string(),
     batchId: z.string().nullable(),
     type: z.string(),
+    source: z.enum(['SYSTEM', 'WEB', 'WHATSAPP']),
     severity: z.enum(['WARNING', 'CRITICAL']),
     title: z.string(),
     description: z.string(),
@@ -48,6 +50,13 @@ const overviewSchema = z.object({
 
 export const overviewQueryOptions = {
   queryKey: ['overview'],
-  queryFn: async () => overviewSchema.parse((await api.get('/api/overview')).data),
+  queryFn: async () => {
+    const overview = overviewSchema.parse((await api.get('/api/overview')).data)
+    return {
+      ...overview,
+      activePlan: overview.activePlan && { ...overview.activePlan, steps: sortPlanSteps(overview.activePlan.steps) },
+      alerts: sortEvents(overview.alerts),
+    }
+  },
   refetchInterval: 30_000,
 }

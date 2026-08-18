@@ -7,6 +7,7 @@ import { PageHeader } from '@/components/page-header.jsx'
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { completePlanStep, plansQueryOptions } from '@/features/plans/plans-api.js'
+import { sortPlanSteps } from '@/lib/ordering.js'
 import { cn } from '@/lib/utils.js'
 import { getWhatsAppUrl } from '@/lib/whatsapp.js'
 
@@ -87,7 +88,7 @@ function StalePlans({ plans }) {
 }
 
 function PlanCard({ plan }) {
-  const steps = [...plan.steps].sort((first, second) => first.sequence - second.sequence)
+  const steps = sortPlanSteps(plan.steps)
   const completed = steps.filter((step) => step.status === 'COMPLETED').length
   const nextStep = steps.find((step) => step.status === 'UPCOMING')
   const active = plan.status === 'ACTIVE'
@@ -132,7 +133,7 @@ function Summary({ label, value }) {
 
 function Trigger({ trigger }) {
   if (!trigger) return <span>Initial plan request</span>
-  return <span className="grid gap-1"><span>{trigger.message}</span><span className="text-xs font-normal text-muted-foreground">{trigger.type.replaceAll('_', ' ').toLowerCase()} · {formatDateTime(trigger.occurredAt)}</span></span>
+  return <span className="grid gap-1"><span>{trigger.message}</span><span className="text-xs font-normal text-muted-foreground">{trigger.type.replaceAll('_', ' ').toLowerCase()} · {trigger.source.toLowerCase()} · ID {trigger.id} · {formatDateTime(trigger.occurredAt)}</span></span>
 }
 
 function PlanContext({ plan, activeUpcomingCount }) {
@@ -141,7 +142,7 @@ function PlanContext({ plan, activeUpcomingCount }) {
 }
 
 function PlanSteps({ plan, completion }) {
-  const steps = [...plan.steps].sort((first, second) => first.sequence - second.sequence)
+  const steps = sortPlanSteps(plan.steps)
   if (!steps.length) return <p className="p-5 text-center text-sm text-muted-foreground">No steps stored for this plan.</p>
 
   return <ol className="divide-y divide-border">{steps.map((step, index) => {
@@ -174,7 +175,7 @@ export function PlanDetailsPage() {
 
       <div className="mt-5 grid grid-cols-[1fr_280px] gap-5 max-[760px]:grid-cols-1">
         <section className="overflow-hidden rounded-xl border border-border bg-card"><header className="border-b border-border p-5"><h2 className="text-sm font-bold">Operational steps</h2><p className="mt-1 text-xs text-muted-foreground">Completed steps are historical facts and cannot be changed.</p></header><PlanSteps plan={plan} completion={plan.status === 'ACTIVE' ? completion : undefined} />{completion.isError && <p className="m-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">Step could not be marked complete. Try again.</p>}</section>
-        <aside className="grid content-start gap-4"><section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">AI context</h2>{plan.trigger ? <div className="mt-3"><span className="text-[10px] font-bold text-muted-foreground uppercase">Trigger</span><p className="mt-1 text-xs leading-relaxed text-slate-600">{plan.trigger.message}</p><p className="mt-1 text-[10px] text-muted-foreground">{plan.trigger.type.replaceAll('_', ' ').toLowerCase()} · {formatDateTime(plan.trigger.occurredAt)}</p></div> : <p className="mt-3 text-xs text-muted-foreground">Initial plan request</p>}<div className="mt-4 border-t border-border pt-4"><span className="text-[10px] font-bold text-muted-foreground uppercase">Reason</span><p className="mt-1 text-xs leading-relaxed text-slate-600">{plan.reason}</p></div></section><section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">Plan details</h2><dl className="mt-4 grid gap-3 text-xs"><Summary label="Plan ID" value={plan.id} /><Summary label="Version" value={`V${plan.version}`} /><Summary label="Status" value={plan.status.toLowerCase()} /><Summary label="Steps" value={plan.steps.length} />{plan.previousPlanId && <Summary label="Previous plan" value={plan.previousPlanId} />}</dl></section><p className="flex gap-2 px-1 text-xs leading-relaxed text-muted-foreground"><Clock3 className="mt-0.5 shrink-0" size={14} />Plans stay synchronized with WhatsApp and operational events.</p></aside>
+        <aside className="grid content-start gap-4"><section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">AI context</h2>{plan.trigger ? <div className="mt-3"><span className="text-[10px] font-bold text-muted-foreground uppercase">Trigger</span><p className="mt-1 text-xs leading-relaxed text-slate-600">{plan.trigger.message}</p><p className="mt-1 text-[10px] text-muted-foreground">{plan.trigger.type.replaceAll('_', ' ').toLowerCase()} · {plan.trigger.source.toLowerCase()} · ID {plan.trigger.id} · {formatDateTime(plan.trigger.occurredAt)}</p></div> : <p className="mt-3 text-xs text-muted-foreground">Initial plan request</p>}<div className="mt-4 border-t border-border pt-4"><span className="text-[10px] font-bold text-muted-foreground uppercase">Reason</span><p className="mt-1 text-xs leading-relaxed text-slate-600">{plan.reason}</p></div></section><section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">Plan details</h2><dl className="mt-4 grid gap-3 text-xs"><Summary label="Plan ID" value={plan.id} /><Summary label="Version" value={`V${plan.version}`} /><Summary label="Status" value={plan.status.toLowerCase()} /><Summary label="Steps" value={plan.steps.length} />{plan.previousPlanId && <Summary label="Previous plan" value={plan.previousPlanId} />}</dl></section><p className="flex gap-2 px-1 text-xs leading-relaxed text-muted-foreground"><Clock3 className="mt-0.5 shrink-0" size={14} />Plans stay synchronized with WhatsApp and operational events.</p></aside>
       </div>
 
       {plan.status === 'PROPOSED' && <section className="mt-5 rounded-xl border border-sky-200 bg-sky-50/50 p-5"><div className="flex items-center justify-between gap-4 max-[600px]:flex-col max-[600px]:items-stretch"><div><h2 className="text-sm font-bold text-sky-950">Review this AI proposal</h2><p className="mt-1 max-w-2xl text-xs leading-relaxed text-sky-900">This proposal is not active. Approve or dismiss it through WhatsApp.</p></div><WhatsAppButton message={`Hello SIRIP, I want to review Plan V${plan.version} (ID ${plan.id}) so I can approve or dismiss it.`} label="Review in WhatsApp" /></div></section>}

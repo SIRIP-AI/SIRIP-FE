@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { api } from '@/lib/axios.js'
+import { sortReadings } from '@/lib/ordering.js'
 
 export const coldStorageStatuses = ['AVAILABLE', 'FULL', 'UNAVAILABLE']
 export const resourceOperationalStatuses = ['AVAILABLE', 'UNAVAILABLE']
@@ -89,6 +90,10 @@ const sensorSchema = sensorInputSchema.safeExtend({
 })
 
 const temperatureReadingSchema = z.object({
+  id: z.string(),
+  readingUid: z.string(),
+  sensorSessionId: z.string(),
+  sequenceNumber: z.number().int().nonnegative(),
   temperatureC: z.number(),
   measuredAt: z.string().datetime(),
   receivedAt: z.string().datetime(),
@@ -135,7 +140,8 @@ export async function listSensorAssignmentOptions() {
 }
 
 export async function listSensorReadings(id) {
-  return z.array(temperatureReadingSchema).max(100).parse((await api.get(`/api/sensors/${id}/readings`)).data)
+  const readings = z.array(temperatureReadingSchema).max(100).parse((await api.get(`/api/sensors/${id}/readings`)).data)
+  return sortReadings(readings)
 }
 
 export async function assignSensor(id, batchCode) {
