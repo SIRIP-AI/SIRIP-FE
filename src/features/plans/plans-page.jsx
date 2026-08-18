@@ -1,222 +1,183 @@
-import { createContext, useContext, useState } from 'react'
-import { ArrowLeft, Check, CheckCircle2, ChevronRight, Clock3, Plus, Route, Ship, Thermometer, Timer, X } from 'lucide-react'
-import { Link, Outlet, useNavigate, useParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { ArrowLeft, Check, CheckCircle2, ChevronDown, CircleX, Clock3, MessageCircle, Route, Ship } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { Appear } from '@/components/appear.jsx'
 import { PageHeader } from '@/components/page-header.jsx'
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
-import { Textarea } from '@/components/ui/textarea.jsx'
+import { completePlanStep, plansQueryOptions } from '@/features/plans/plans-api.js'
 import { cn } from '@/lib/utils.js'
+import { getWhatsAppUrl } from '@/lib/whatsapp.js'
 
-const batches = [
-  { id: 'B-017', weight: 120, grade: 'A', temperature: 8, remaining: 4.2, origin: 'FT-001' },
-  { id: 'B-021', weight: 95, grade: 'A', temperature: 3.2, remaining: 7.1, origin: 'FT-003' },
-  { id: 'B-024', weight: 140, grade: 'B', temperature: 5.1, remaining: 5.8, origin: 'FT-003' },
-  { id: 'B-029', weight: 110, grade: 'A', temperature: 2.8, remaining: 8.4, origin: 'FT-005' },
-]
+const actions = {
+  STORE: 'Store',
+  LOAD: 'Load',
+  DISPATCH: 'Dispatch',
+  HANDOVER: 'Hand over',
+  INSPECT: 'Inspect',
+  OTHER: 'Handle',
+}
 
-const destinations = [
-  { id: 'processor-a', name: 'Processor A', location: 'Tanjung Perak', travel: 45, window: '08:00–16:00' },
-  { id: 'processor-b', name: 'Processor B', location: 'Rungkut', travel: 70, window: '09:00–17:00' },
-  { id: 'processor-c', name: 'Processor C', location: 'Sidoarjo', travel: 90, window: '07:00–15:00' },
-]
+const prepositions = {
+  STORE: 'in',
+  LOAD: 'into',
+  DISPATCH: 'to',
+  HANDOVER: 'at',
+  INSPECT: 'at',
+  OTHER: 'with',
+}
 
-const initialPlans = [
-  {
-    id: 'PLN-104',
-    status: 'ACTIVE',
-    title: 'Morning dispatch · B-017',
-    batchIds: ['B-017'],
-    destination: 'Processor B',
-    reasoning: 'B-017 is dispatched first because it has the shortest remaining quality window and has already reached Cold Room 1.',
-    createdAt: '15 Aug 2026, 08:42',
-    approvedAt: '15 Aug 2026, 08:48',
-    approvedBy: 'Adi Rahman',
-    steps: [
-      { id: '104-1', dueAt: '09:00', batchId: 'B-017', action: 'Store in Cold Room 1', completedAt: '15 Aug 2026, 08:57' },
-      { id: '104-2', dueAt: '10:30', batchId: 'B-017', action: 'Load into TR-01' },
-      { id: '104-3', dueAt: '11:00', batchId: 'B-017', action: 'Dispatch to Processor B' },
-    ],
-  },
-  {
-    id: 'PLN-105',
-    status: 'ACTIVE',
-    title: 'Quality-safe transfer · B-021',
-    batchIds: ['B-021'],
-    destination: 'Processor A',
-    reasoning: 'B-021 can move independently while TR-02 and Processor A remain available.',
-    createdAt: '15 Aug 2026, 09:05',
-    approvedAt: '15 Aug 2026, 09:11',
-    approvedBy: 'Adi Rahman',
-    steps: [
-      { id: '105-1', dueAt: '11:15', batchId: 'B-021', action: 'Inspect seal and temperature' },
-      { id: '105-2', dueAt: '11:30', batchId: 'B-021', action: 'Load into TR-02' },
-      { id: '105-3', dueAt: '12:10', batchId: 'B-021', action: 'Handover at Processor A' },
-    ],
-  },
-  {
-    id: 'PLN-106',
-    status: 'PROPOSED',
-    title: 'Afternoon dispatch · B-024',
-    batchIds: ['B-024'],
-    destination: 'Processor C',
-    reasoning: 'Processor C has enough receiving capacity and the route preserves B-024’s expected quality margin.',
-    createdAt: '15 Aug 2026, 09:24',
-    source: 'Web planning context',
-    steps: [
-      { id: '106-1', dueAt: '13:00', batchId: 'B-024', action: 'Move to staging bay' },
-      { id: '106-2', dueAt: '13:30', batchId: 'B-024', action: 'Load into available vehicle' },
-      { id: '106-3', dueAt: '15:00', batchId: 'B-024', action: 'Handover at Processor C' },
-    ],
-  },
-]
+const dateFormatter = new Intl.DateTimeFormat([], { day: 'numeric', month: 'short', year: 'numeric' })
+const timeFormatter = new Intl.DateTimeFormat([], { hour: '2-digit', minute: '2-digit' })
+const dateTimeFormatter = new Intl.DateTimeFormat([], { dateStyle: 'medium', timeStyle: 'short' })
 
-const PlansContext = createContext(null)
+function formatDate(value) {
+  return dateFormatter.format(new Date(value))
+}
 
-export function PlansLayout() {
-  const [plans, setPlans] = useState(initialPlans)
+function formatTime(value) {
+  return timeFormatter.format(new Date(value))
+}
 
-  function createProposal(plan) {
-    setPlans((current) => [plan, ...current])
-  }
+function formatDateTime(value) {
+  return dateTimeFormatter.format(new Date(value))
+}
 
-  function approvePlan(planId) {
-    setPlans((current) => current.map((plan) => plan.id === planId ? {
-      ...plan,
-      status: 'ACTIVE',
-      approvedAt: 'Just now',
-      approvedBy: 'Adi Rahman',
-    } : plan))
-  }
+function describeStep(step) {
+  return `${actions[step.actionType]} ${step.batch.code}${step.resource ? ` ${prepositions[step.actionType]} ${step.resource.name}` : ''}`
+}
 
-  function completeStep(planId, stepId) {
-    setPlans((current) => current.map((plan) => plan.id === planId ? {
-      ...plan,
-      steps: plan.steps.map((step) => step.id === stepId && !step.completedAt ? { ...step, completedAt: 'Just now' } : step),
-    } : plan))
-  }
+function statusBadge(status) {
+  if (status === 'ACTIVE') return <StatusBadge tone="healthy">Active</StatusBadge>
+  if (status === 'PROPOSED') return <StatusBadge className="bg-sky-50 text-sky-700">Proposed</StatusBadge>
+  if (status === 'DISMISSED') return <StatusBadge tone="critical">Dismissed</StatusBadge>
+  return <StatusBadge>Superseded</StatusBadge>
+}
 
-  return <PlansContext.Provider value={{ plans, createProposal, approvePlan, completeStep }}><Outlet /></PlansContext.Provider>
+function WhatsAppButton({ message, label = 'Open WhatsApp', className, variant = 'default' }) {
+  const url = getWhatsAppUrl(message)
+  return url ? <Button className={className} variant={variant} asChild><a href={url} target="_blank" rel="noreferrer"><MessageCircle />{label}</a></Button> : <Button className={className} variant={variant} type="button" disabled title="Set VITE_WHATSAPP_URL to enable WhatsApp."><MessageCircle />{label}</Button>
 }
 
 function usePlans() {
-  return useContext(PlansContext)
+  const queryClient = useQueryClient()
+  const plans = useQuery(plansQueryOptions)
+  const completion = useMutation({
+    mutationFn: ({ planId, stepId }) => completePlanStep(planId, stepId),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['plans'] }),
+        queryClient.invalidateQueries({ queryKey: ['overview'] }),
+      ])
+    },
+  })
+  return { plans, completion }
 }
 
-function BatchOption({ batch, selected, onToggle }) {
-  return <label className={cn('block cursor-pointer rounded-xl border bg-card p-4 transition-colors', selected ? 'border-primary bg-primary/[.035]' : 'border-border hover:border-slate-300')}>
-    <input className="sr-only" type="checkbox" checked={selected} onChange={onToggle} />
-    <div className="flex items-start justify-between gap-3"><div><strong className="text-sm">{batch.id}</strong><p className="mt-1 text-xs text-muted-foreground">{batch.weight} kg · Grade {batch.grade} · {batch.origin}</p></div><span className={cn('grid size-5 place-items-center rounded border', selected ? 'border-primary bg-primary text-white' : 'border-input bg-white')}>{selected && <Check size={13} />}</span></div>
-    <div className="mt-4 grid grid-cols-2 divide-x divide-border border-y border-border py-3"><Metric icon={Thermometer} label="Temperature" value={`${batch.temperature}°C`} /><Metric icon={Timer} label="Quality remaining" value={`${batch.remaining} days`} /></div>
-  </label>
+function QueryState({ plans }) {
+  if (plans.isPending) return <div className="flex min-h-56 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground" role="status" aria-live="polite">Loading plans…</div>
+  if (plans.isError && !plans.data) return <div className="flex min-h-56 items-center justify-center rounded-xl border border-red-200 bg-red-50/60 p-6 text-center" role="alert"><div><strong className="block text-sm text-red-800">Plans unavailable</strong><p className="mt-2 text-sm text-red-700">Check the API connection and try again.</p><Button className="mt-4" variant="outline" type="button" onClick={() => plans.refetch()}>Try again</Button></div></div>
+  return null
 }
 
-function Metric({ icon: Icon, label, value }) {
-  return <div className="px-3 first:pl-0 last:pr-0"><span className="flex items-center gap-1.5 text-[10px] text-muted-foreground"><Icon size={13} />{label}</span><strong className="mt-1.5 block text-sm">{value}</strong></div>
-}
-
-function Builder({ nextNumber, onCancel, onCreate }) {
-  const [step, setStep] = useState(1)
-  const [selected, setSelected] = useState([])
-  const [assignments, setAssignments] = useState({})
-  const selectedBatches = batches.filter((batch) => selected.includes(batch.id))
-  const ready = selected.length > 0 && selected.every((id) => assignments[id])
-
-  function toggle(id) {
-    setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id])
-  }
-
-  function submit() {
-    const id = `PLN-${nextNumber}`
-    onCreate({
-      id,
-      status: 'PROPOSED',
-      title: `${selected.length > 1 ? 'Combined dispatch' : 'Batch dispatch'} · ${selected.join(', ')}`,
-      batchIds: selected,
-      destination: selected.length === 1 ? destinations.find((item) => item.id === assignments[selected[0]])?.name : 'Multiple destinations',
-      reasoning: 'Planning context is ready for AI validation. Review the generated sequence before activating this plan.',
-      createdAt: 'Just now',
-      source: 'Web planning context',
-      steps: selected.flatMap((batchId, index) => {
-        const destination = destinations.find((item) => item.id === assignments[batchId])
-        return [
-          { id: `${id}-${batchId}-1`, dueAt: `${13 + index}:00`, batchId, action: 'Inspect temperature and packaging' },
-          { id: `${id}-${batchId}-2`, dueAt: `${13 + index}:30`, batchId, action: `Dispatch to ${destination.name}` },
-        ]
-      }),
-    })
-  }
-
-  return <Appear as="section" className="rounded-xl border border-primary/30 bg-primary/[.025]">
-    <header className="flex items-center justify-between gap-4 border-b border-primary/15 p-5"><div><h2 className="text-lg font-bold">Create plan context</h2><p className="mt-1 text-xs text-muted-foreground">{step === 1 ? 'Select batches' : step === 2 ? 'Assign destinations' : 'Review before generating'}</p></div><Button variant="ghost" size="icon" onClick={onCancel} aria-label="Cancel plan"><X /></Button></header>
-    <div className="grid grid-cols-[1fr_240px] max-[800px]:grid-cols-1"><div className="p-5">
-      {step === 1 && <div className="grid grid-cols-2 gap-3 max-[620px]:grid-cols-1">{batches.map((batch) => <BatchOption key={batch.id} batch={batch} selected={selected.includes(batch.id)} onToggle={() => toggle(batch.id)} />)}</div>}
-      {step === 2 && <div className="grid gap-3">{selectedBatches.map((batch) => <article className="rounded-xl border border-border bg-card p-4" key={batch.id}><strong className="text-sm">{batch.id}</strong><Select value={assignments[batch.id]} onValueChange={(destination) => setAssignments((current) => ({ ...current, [batch.id]: destination }))}><SelectTrigger className="mt-3 w-full bg-white"><SelectValue placeholder="Select destination" /></SelectTrigger><SelectContent>{destinations.map((destination) => <SelectItem key={destination.id} value={destination.id}>{destination.name} · {destination.travel} min</SelectItem>)}</SelectContent></Select></article>)}</div>}
-      {step === 3 && <div className="grid gap-3">{selectedBatches.map((batch) => { const destination = destinations.find((item) => item.id === assignments[batch.id]); return <div className="flex items-center justify-between rounded-xl border border-border bg-card p-4" key={batch.id}><div><strong className="text-sm">{batch.id}</strong><p className="mt-1 text-xs text-muted-foreground">{batch.weight} kg · Grade {batch.grade}</p></div><span className="text-xs font-semibold">{destination.name}</span></div> })}<p className="rounded-lg bg-sky-50 p-3 text-xs leading-relaxed text-sky-800">Generating creates an inactive proposal. Review and approve it on the website before operations begin.</p></div>}
-    </div><aside className="min-w-0 border-l border-primary/15 bg-white/60 p-5 max-[800px]:border-t max-[800px]:border-l-0"><h3 className="text-xs font-bold">Planning context</h3><dl className="mt-4 grid gap-3 text-xs"><Summary label="Batches" value={selected.length} /><Summary label="Total weight" value={`${selectedBatches.reduce((total, batch) => total + batch.weight, 0)} kg`} /><Summary label="Assigned" value={`${Object.keys(assignments).filter((id) => selected.includes(id)).length} of ${selected.length}`} /></dl><div className="mt-6 grid min-w-0 gap-2">{step > 1 && <Button className="w-full min-w-0" variant="outline" onClick={() => setStep(step - 1)}><ArrowLeft />Back</Button>}{step < 3 ? <Button className="w-full min-w-0" disabled={step === 1 ? !selected.length : !ready} onClick={() => setStep(step + 1)}>Continue<ChevronRight /></Button> : <Button className="w-full min-w-0" onClick={submit}><CheckCircle2 />Generate proposal</Button>}</div></aside></div>
-  </Appear>
-}
-
-function Summary({ label, value }) {
-  return <div className="flex items-center justify-between gap-3"><dt className="text-muted-foreground">{label}</dt><dd className="font-bold">{value}</dd></div>
+function StalePlans({ plans }) {
+  if (!plans.isRefetchError) return null
+  return <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status"><span>Showing the last available plan data.</span><Button size="sm" variant="outline" type="button" onClick={() => plans.refetch()}>Retry</Button></div>
 }
 
 function PlanCard({ plan }) {
-  const completed = plan.steps.filter((step) => step.completedAt).length
-  const nextStep = plan.steps.find((step) => !step.completedAt)
+  const steps = [...plan.steps].sort((first, second) => first.sequence - second.sequence)
+  const completed = steps.filter((step) => step.status === 'COMPLETED').length
+  const nextStep = steps.find((step) => step.status === 'UPCOMING')
   const active = plan.status === 'ACTIVE'
-  return <Appear as="article" className={cn('group rounded-xl border bg-card p-5 transition-colors', active ? 'border-border hover:border-primary/35' : 'border-sky-200 bg-sky-50/30')}>
-    <div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-bold">{plan.id}</h3><StatusBadge tone={active ? 'healthy' : 'neutral'}>{active ? 'Active' : 'Proposed'}</StatusBadge></div><p className="mt-2 text-sm font-semibold">{plan.title}</p><p className="mt-1 text-xs text-muted-foreground">{plan.batchIds.join(', ')} · {plan.destination}</p></div><Route className={active ? 'text-primary' : 'text-sky-600'} size={20} /></div>
-    {active ? <div className="mt-5"><div className="mb-2 flex items-center justify-between text-xs"><span className="text-muted-foreground">{nextStep ? `Next · ${nextStep.dueAt}` : 'All steps complete'}</span><strong>{completed}/{plan.steps.length}</strong></div><div className="flex gap-1" aria-label={`${completed} of ${plan.steps.length} steps completed`}>{plan.steps.map((step) => <span className={cn('h-1.5 flex-1 rounded-full', step.completedAt ? 'bg-primary' : 'bg-slate-200')} key={step.id} />)}</div>{nextStep && <p className="mt-3 truncate text-xs">{nextStep.action}</p>}</div> : <p className="mt-5 rounded-lg bg-white/80 p-3 text-xs leading-relaxed text-slate-600">Inactive until reviewed and approved on the website.</p>}
-    <Button className="mt-5 w-full" variant={active ? 'outline' : 'default'} asChild><Link to={`/plans/${plan.id}`}>{active ? 'Open plan' : 'Review and approve'}<ChevronRight /></Link></Button>
+  const proposed = plan.status === 'PROPOSED'
+
+  return <Appear as="article" className={cn('group rounded-xl border bg-card p-5 transition-colors', active ? 'border-border hover:border-primary/35' : proposed ? 'border-sky-200 bg-sky-50/30' : 'border-border')}>
+    <div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-bold">Plan V{plan.version}</h3>{statusBadge(plan.status)}</div><p className="mt-2 line-clamp-2 text-sm font-semibold leading-relaxed">{plan.reason}</p><p className="mt-1 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}</p></div><Route className={active ? 'shrink-0 text-primary' : proposed ? 'shrink-0 text-sky-600' : 'shrink-0 text-slate-400'} size={20} /></div>
+    {active ? <div className="mt-5"><div className="mb-2 flex items-center justify-between text-xs"><span className="text-muted-foreground">{nextStep ? `Next · ${formatTime(nextStep.scheduledAt)}` : 'All steps complete'}</span><strong>{completed}/{steps.length}</strong></div><div className="flex gap-1" aria-label={`${completed} of ${steps.length} steps completed`}>{steps.map((step) => <span className={cn('h-1.5 flex-1 rounded-full', step.status === 'COMPLETED' ? 'bg-primary' : step.status === 'CANCELED' ? 'bg-slate-300' : 'bg-slate-200')} key={step.id} />)}</div>{nextStep && <p className="mt-3 truncate text-xs">{describeStep(nextStep)}</p>}</div> : proposed ? <p className="mt-5 rounded-lg bg-white/80 p-3 text-xs leading-relaxed text-slate-600">Proposed by AI. Approval and dismissal remain in WhatsApp.</p> : <p className="mt-5 rounded-lg bg-slate-50 p-3 text-xs leading-relaxed text-slate-600">Stored plan and completed actions remain available as history.</p>}
+    <Button className="mt-5 w-full" variant={active || !proposed ? 'outline' : 'default'} asChild><Link to={`/plans/${plan.id}`}>{active ? 'Open active plan' : proposed ? 'Review proposal' : 'View stored plan'}</Link></Button>
   </Appear>
 }
 
-export function PlansPage() {
-  const { plans, createProposal } = usePlans()
-  const [creating, setCreating] = useState(false)
-  const newestFirst = (left, right) => Number(right.id.split('-')[1]) - Number(left.id.split('-')[1])
-  const activePlans = plans.filter((plan) => plan.status === 'ACTIVE').sort(newestFirst)
-  const proposedPlans = plans.filter((plan) => plan.status === 'PROPOSED').sort(newestFirst)
-  const nextNumber = Math.max(...plans.map((plan) => Number(plan.id.split('-')[1]))) + 1
+function ProposedPlan({ plan, activeUpcomingCount }) {
+  return <Appear as="article" className="overflow-hidden rounded-xl border border-sky-200 bg-sky-50/30">
+    <header className="flex items-start justify-between gap-4 border-b border-sky-200 bg-white/70 p-5"><div><div className="flex flex-wrap items-center gap-2"><h3 className="text-base font-bold">Plan V{plan.version}</h3>{statusBadge(plan.status)}</div><p className="mt-1 text-xs text-muted-foreground">Proposed {formatDateTime(plan.createdAt)}</p></div><Route className="shrink-0 text-sky-700" size={20} /></header>
+    <div className="grid gap-5 p-5"><PlanContext plan={plan} activeUpcomingCount={activeUpcomingCount} /><div><h4 className="mb-3 text-sm font-bold">Proposed steps</h4><div className="overflow-hidden rounded-xl border border-border bg-card"><PlanSteps plan={plan} /></div></div><div className="flex items-center justify-between gap-4 rounded-lg border border-sky-200 bg-white p-4 max-[620px]:flex-col max-[620px]:items-stretch"><p className="flex items-start gap-2 text-sm font-semibold text-sky-900"><MessageCircle className="mt-0.5 shrink-0" size={16} />Approve or dismiss this proposal through WhatsApp.</p><div className="flex gap-2 max-[620px]:flex-col"><Button variant="outline" asChild><Link to={`/plans/${plan.id}`}>View details</Link></Button><WhatsAppButton message={`Hello SIRIP, I want to review Plan V${plan.version} (ID ${plan.id}) so I can approve or dismiss it.`} label="Review in WhatsApp" /></div></div></div>
+  </Appear>
+}
 
-  function create(plan) {
-    createProposal(plan)
-    setCreating(false)
-  }
+function EmptyPlans() {
+  return <Appear className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-8 text-center"><Route className="mx-auto text-muted-foreground" size={24} /><h2 className="mt-3 text-base font-bold">No plans yet</h2><p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">Request the initial AI plan through WhatsApp. Approved plans and proposals will appear here.</p><WhatsAppButton className="mt-5" message="Hello SIRIP, I want to request the initial operation plan." label="Request initial plan" /></Appear>
+}
+
+export function PlansPage() {
+  const { plans } = usePlans()
+  const data = plans.data
 
   return <div className="mx-auto w-full max-w-[1180px] px-8 pt-12 pb-7 max-[780px]:px-4 max-[780px]:py-6">
-    <PageHeader title="Plans" description="Run several approved plans at once, and review new proposals before they become operational." action={<Button onClick={() => setCreating(true)} disabled={creating}><Plus />Create new plan</Button>} />
-    <div className="grid gap-8">
-      {creating && <Builder nextNumber={nextNumber} onCancel={() => setCreating(false)} onCreate={create} />}
-      <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-sm font-bold">Active plans</h2><p className="mt-1 text-xs text-muted-foreground">Each plan runs independently until all steps are complete.</p></div><span className="text-xs font-bold text-primary">{activePlans.length} running</span></div><div className="grid grid-cols-3 gap-3.5 max-[1020px]:grid-cols-2 max-[640px]:grid-cols-1">{activePlans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}</div></section>
-      <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-sm font-bold">Proposed plans</h2><p className="mt-1 text-xs text-muted-foreground">Generated plans remain inactive until approved here.</p></div><span className="text-xs text-muted-foreground">{proposedPlans.length} awaiting review</span></div>{proposedPlans.length ? <div className="grid grid-cols-3 gap-3.5 max-[1020px]:grid-cols-2 max-[640px]:grid-cols-1">{proposedPlans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}</div> : <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground"><Ship className="mr-2" size={17} />No proposed plans</div>}</section>
-    </div>
+    <PageHeader title="Plans" description="Follow the active operation plan and review AI proposals. Approval and dismissal remain in WhatsApp." action={<WhatsAppButton message="Hello SIRIP, I want to request an operation plan." label="Request plan" />} />
+    <QueryState plans={plans} />
+    {data && <div className="grid gap-8"><StalePlans plans={plans} /><p className="-mt-4 text-right text-xs text-muted-foreground">Updated {formatDateTime(data.updatedAt)}</p>{!data.activePlan && !data.proposedPlans.length && !data.history.length ? <EmptyPlans /> : <>
+      <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-sm font-bold">Active plan</h2><p className="mt-1 text-xs text-muted-foreground">The approved plan currently guiding operations.</p></div><span className="text-xs font-bold text-primary">{data.activePlan ? '1 active' : 'None active'}</span></div>{data.activePlan ? <div className="grid grid-cols-3 gap-3.5 max-[1020px]:grid-cols-2 max-[640px]:grid-cols-1"><PlanCard plan={data.activePlan} /></div> : <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground"><Route className="mr-2" size={17} />No active plan</div>}</section>
+      <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-sm font-bold">Proposed plans</h2><p className="mt-1 text-xs text-muted-foreground">AI proposals stay inactive until approved through WhatsApp.</p></div><span className="text-xs text-muted-foreground">{data.proposedPlans.length} awaiting review</span></div>{data.proposedPlans.length ? <div className="grid gap-4">{data.proposedPlans.map((plan) => <ProposedPlan key={plan.id} plan={plan} activeUpcomingCount={data.activePlan?.steps.filter((step) => step.status === 'UPCOMING').length ?? 0} />)}</div> : <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground"><Ship className="mr-2" size={17} />No proposed plans</div>}</section>
+      <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-sm font-bold">Plan history</h2><p className="mt-1 text-xs text-muted-foreground">Previous versions preserve their stored reasons and steps.</p></div><span className="text-xs text-muted-foreground">{data.history.length} stored</span></div>{data.history.length ? <div className="grid gap-2">{data.history.map((plan) => <details className="group overflow-hidden rounded-lg border border-border bg-card" key={plan.id}><summary className="flex cursor-pointer list-none items-center gap-3 p-4 outline-none focus-visible:ring-3 focus-visible:ring-ring/50 [&::-webkit-details-marker]:hidden"><strong className="text-sm">Plan V{plan.version}</strong>{statusBadge(plan.status)}<time className="ml-auto text-xs text-muted-foreground" dateTime={plan.createdAt}>{formatDate(plan.createdAt)}</time><ChevronDown className="text-muted-foreground transition-transform group-open:rotate-180" size={17} aria-hidden="true" /></summary><div className="grid gap-4 border-t border-border p-4"><PlanContext plan={plan} /><div><h3 className="mb-3 text-sm font-bold">Stored steps</h3><div className="overflow-hidden rounded-xl border border-border"><PlanSteps plan={plan} /></div></div></div></details>)}</div> : <div className="flex min-h-32 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground">No plan history yet</div>}</section>
+    </>}</div>}
   </div>
+}
+
+function Summary({ label, value }) {
+  return <div className="flex items-start justify-between gap-3"><dt className="text-muted-foreground">{label}</dt><dd className="text-right font-bold">{value}</dd></div>
+}
+
+function Trigger({ trigger }) {
+  if (!trigger) return <span>Initial plan request</span>
+  return <span className="grid gap-1"><span>{trigger.message}</span><span className="text-xs font-normal text-muted-foreground">{trigger.type.replaceAll('_', ' ').toLowerCase()} · {formatDateTime(trigger.occurredAt)}</span></span>
+}
+
+function PlanContext({ plan, activeUpcomingCount }) {
+  const futureStepCount = plan.steps.filter((step) => step.status === 'UPCOMING').length
+  return <dl className="grid gap-3 rounded-lg bg-slate-50 p-4 text-sm sm:grid-cols-2"><div className="grid content-start gap-1"><dt className="text-[10px] font-bold text-slate-500 uppercase">Trigger</dt><dd className="leading-relaxed"><Trigger trigger={plan.trigger} /></dd></div>{activeUpcomingCount !== undefined && <div className="grid content-start gap-1"><dt className="text-[10px] font-bold text-slate-500 uppercase">Change summary</dt><dd className="leading-relaxed">{futureStepCount} future {futureStepCount === 1 ? 'step' : 'steps'} proposed; the current active plan has {activeUpcomingCount} upcoming {activeUpcomingCount === 1 ? 'step' : 'steps'}.</dd></div>}<div className={cn('grid content-start gap-1', activeUpcomingCount !== undefined && 'sm:col-span-2')}><dt className="text-[10px] font-bold text-slate-500 uppercase">Reason</dt><dd className="leading-relaxed text-slate-700">{plan.reason}</dd></div></dl>
+}
+
+function PlanSteps({ plan, completion }) {
+  const steps = [...plan.steps].sort((first, second) => first.sequence - second.sequence)
+  if (!steps.length) return <p className="p-5 text-center text-sm text-muted-foreground">No steps stored for this plan.</p>
+
+  return <ol className="divide-y divide-border">{steps.map((step, index) => {
+    const completed = step.status === 'COMPLETED'
+    const canceled = step.status === 'CANCELED'
+    const marking = completion?.isPending && completion.variables?.stepId === step.id
+    return <li className={cn('grid grid-cols-[64px_40px_1fr_auto] items-center gap-3 p-5 max-[560px]:grid-cols-[52px_32px_1fr]', completed && 'bg-slate-50 text-slate-500', canceled && 'bg-slate-50 text-slate-500')} key={step.id}>
+      <time className="text-xs font-bold" dateTime={step.scheduledAt}>{formatTime(step.scheduledAt)}</time>
+      <span className={cn('grid size-8 place-items-center rounded-full border text-xs font-bold max-[560px]:size-7', completed ? 'border-primary bg-primary text-white' : canceled ? 'border-slate-300 bg-slate-200 text-slate-500' : 'border-slate-300 bg-white text-slate-500')}>{completed ? <Check size={15} /> : canceled ? <CircleX size={15} /> : index + 1}</span>
+      <div className="min-w-0"><strong className={cn('block text-sm', canceled && 'line-through')}>{describeStep(step)}</strong><span className="mt-1 block text-xs">{step.batch.code} · {completed ? `Completed ${formatDateTime(step.completedAt)}` : canceled ? 'Canceled' : `Scheduled ${formatDate(step.scheduledAt)}`}</span>{step.notes && <span className="mt-1 block text-xs text-muted-foreground">{step.notes}</span>}</div>
+      {completion && step.status === 'UPCOMING' && <Button className="max-[560px]:col-span-3 max-[560px]:ml-[84px]" size="sm" variant="outline" type="button" disabled={completion.isPending} onClick={() => completion.mutate({ planId: plan.id, stepId: step.id })}><CheckCircle2 />{marking ? 'Marking…' : 'Mark complete'}</Button>}
+      {completed && <span className="flex items-center gap-1 text-xs font-semibold text-emerald-700 max-[560px]:col-span-3 max-[560px]:ml-[84px]"><CheckCircle2 size={14} />Completed · locked</span>}
+      {canceled && <span className="text-xs font-semibold text-slate-500 max-[560px]:col-span-3 max-[560px]:ml-[84px]">Canceled</span>}
+    </li>
+  })}</ol>
 }
 
 export function PlanDetailsPage() {
   const { planId } = useParams()
   const navigate = useNavigate()
-  const { plans, approvePlan, completeStep } = usePlans()
-  const [comments, setComments] = useState('')
-  const plan = plans.find((item) => item.id === planId)
+  const { plans, completion } = usePlans()
+  const data = plans.data
+  const plan = data ? [data.activePlan, ...data.proposedPlans, ...data.history].filter(Boolean).find((item) => item.id === planId) : null
 
-  if (!plan) return <div className="mx-auto max-w-3xl px-8 py-12"><p className="text-sm">Plan not found.</p><Button className="mt-4" variant="outline" asChild><Link to="/plans"><ArrowLeft />Back to plans</Link></Button></div>
-
-  const active = plan.status === 'ACTIVE'
-  const completed = plan.steps.filter((step) => step.completedAt).length
   return <div className="mx-auto w-full max-w-[980px] px-8 pt-10 pb-8 max-[780px]:px-4 max-[780px]:py-6">
     <Button className="mb-5" variant="ghost" onClick={() => navigate('/plans')}><ArrowLeft />All plans</Button>
-    <header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">{plan.id}</h1><StatusBadge tone={active ? 'healthy' : 'neutral'}>{active ? 'Active' : 'Proposed'}</StatusBadge></div><p className="mt-2 text-base font-semibold">{plan.title}</p><p className="mt-1 text-xs text-muted-foreground">Created {plan.createdAt} · {plan.source ?? 'Approved web plan'}</p></div>{active && <div className="text-right"><strong className="text-2xl tracking-[-.04em]">{completed}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div>}</div>
-    </header>
+    <QueryState plans={plans} />
+    {data && !plan && <div className="rounded-xl border border-border bg-card p-8 text-center"><p className="text-sm">Plan not found.</p><Button className="mt-4" variant="outline" asChild><Link to="/plans"><ArrowLeft />Back to plans</Link></Button></div>}
+    {plan && <><StalePlans plans={plans} /><header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">Plan V{plan.version}</h1>{statusBadge(plan.status)}</div><p className="mt-2 max-w-2xl text-base font-semibold leading-relaxed">{plan.reason}</p><p className="mt-1 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}{plan.approvedAt ? ` · Approved ${formatDateTime(plan.approvedAt)}` : ''}</p></div>{plan.status === 'ACTIVE' && <div className="text-right"><strong className="text-2xl tracking-[-.04em]">{plan.steps.filter((step) => step.status === 'COMPLETED').length}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div>}</div></header>
 
-    <div className="mt-5 grid grid-cols-[1fr_280px] gap-5 max-[760px]:grid-cols-1">
-      <section className="rounded-xl border border-border bg-card"><header className="border-b border-border p-5"><h2 className="text-sm font-bold">Operational steps</h2><p className="mt-1 text-xs text-muted-foreground">Completed steps are timestamped and cannot be changed.</p></header><ol className="divide-y divide-border">{plan.steps.map((step, index) => <li className={cn('grid grid-cols-[56px_40px_1fr_auto] items-center gap-3 p-5 max-[560px]:grid-cols-[44px_32px_1fr]', step.completedAt && 'bg-slate-50 text-slate-500')} key={step.id}><time className="text-xs font-bold">{step.dueAt}</time><span className={cn('grid size-8 place-items-center rounded-full border text-xs font-bold', step.completedAt ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white text-slate-500')}>{step.completedAt ? <Check size={15} /> : index + 1}</span><div><strong className="block text-sm">{step.action}</strong><span className="mt-1 block text-xs">{step.batchId}{step.completedAt ? ` · Completed ${step.completedAt}` : ' · Scheduled'}</span></div>{active && <Button className="max-[560px]:col-span-3 max-[560px]:ml-[76px]" size="sm" variant={step.completedAt ? 'ghost' : 'outline'} disabled={Boolean(step.completedAt)} onClick={() => completeStep(plan.id, step.id)}>{step.completedAt ? 'Completed' : 'Mark complete'}</Button>}</li>)}</ol></section>
-      <aside className="grid content-start gap-4"><section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">AI context</h2><p className="mt-3 text-xs leading-relaxed text-slate-600">{plan.reasoning}</p></section><section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">Plan details</h2><dl className="mt-4 grid gap-3 text-xs"><Summary label="Batches" value={plan.batchIds.join(', ')} /><Summary label="Destination" value={plan.destination} />{plan.approvedAt && <><Summary label="Approved" value={plan.approvedAt} /><Summary label="Approved by" value={plan.approvedBy} /></>}</dl></section><p className="flex gap-2 px-1 text-xs leading-relaxed text-muted-foreground"><Clock3 className="mt-0.5 shrink-0" size={14} />Future alerts and replanning decisions will stay synchronized with WhatsApp and IoT events.</p></aside>
-    </div>
-    {!active && <section className="mt-5 rounded-xl border border-sky-200 bg-sky-50/50 p-5"><div className="max-w-2xl"><label className="text-sm font-bold" htmlFor="plan-comments">Operator comments</label><p className="mt-1 text-xs leading-relaxed text-muted-foreground">Add constraints, corrections, or context for the next edit before making this plan active.</p><Textarea className="mt-3 min-h-28 bg-white" id="plan-comments" value={comments} onChange={(event) => setComments(event.target.value)} placeholder="Add a comment for this proposed plan" maxLength={1000} /></div><div className="mt-5 flex items-center justify-between gap-4 border-t border-sky-200 pt-5 max-[600px]:flex-col max-[600px]:items-stretch"><p className="max-w-md text-xs leading-relaxed text-sky-900">Approval activates this plan alongside the {plans.filter((item) => item.status === 'ACTIVE').length} plans already running.</p><div className="flex gap-2 max-[600px]:flex-col"><Button variant="outline">Edit plan</Button><Button onClick={() => approvePlan(plan.id)}><CheckCircle2 />Approve and activate</Button></div></div></section>}
+      <div className="mt-5 grid grid-cols-[1fr_280px] gap-5 max-[760px]:grid-cols-1">
+        <section className="overflow-hidden rounded-xl border border-border bg-card"><header className="border-b border-border p-5"><h2 className="text-sm font-bold">Operational steps</h2><p className="mt-1 text-xs text-muted-foreground">Completed steps are historical facts and cannot be changed.</p></header><PlanSteps plan={plan} completion={plan.status === 'ACTIVE' ? completion : undefined} />{completion.isError && <p className="m-5 rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700" role="alert">Step could not be marked complete. Try again.</p>}</section>
+        <aside className="grid content-start gap-4"><section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">AI context</h2>{plan.trigger ? <div className="mt-3"><span className="text-[10px] font-bold text-muted-foreground uppercase">Trigger</span><p className="mt-1 text-xs leading-relaxed text-slate-600">{plan.trigger.message}</p><p className="mt-1 text-[10px] text-muted-foreground">{plan.trigger.type.replaceAll('_', ' ').toLowerCase()} · {formatDateTime(plan.trigger.occurredAt)}</p></div> : <p className="mt-3 text-xs text-muted-foreground">Initial plan request</p>}<div className="mt-4 border-t border-border pt-4"><span className="text-[10px] font-bold text-muted-foreground uppercase">Reason</span><p className="mt-1 text-xs leading-relaxed text-slate-600">{plan.reason}</p></div></section><section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">Plan details</h2><dl className="mt-4 grid gap-3 text-xs"><Summary label="Plan ID" value={plan.id} /><Summary label="Version" value={`V${plan.version}`} /><Summary label="Status" value={plan.status.toLowerCase()} /><Summary label="Steps" value={plan.steps.length} />{plan.previousPlanId && <Summary label="Previous plan" value={plan.previousPlanId} />}</dl></section><p className="flex gap-2 px-1 text-xs leading-relaxed text-muted-foreground"><Clock3 className="mt-0.5 shrink-0" size={14} />Plans stay synchronized with WhatsApp and operational events.</p></aside>
+      </div>
+
+      {plan.status === 'PROPOSED' && <section className="mt-5 rounded-xl border border-sky-200 bg-sky-50/50 p-5"><div className="flex items-center justify-between gap-4 max-[600px]:flex-col max-[600px]:items-stretch"><div><h2 className="text-sm font-bold text-sky-950">Review this AI proposal</h2><p className="mt-1 max-w-2xl text-xs leading-relaxed text-sky-900">This proposal is not active. Approve or dismiss it through WhatsApp.</p></div><WhatsAppButton message={`Hello SIRIP, I want to review Plan V${plan.version} (ID ${plan.id}) so I can approve or dismiss it.`} label="Review in WhatsApp" /></div></section>}
+    </>}
   </div>
 }

@@ -7,6 +7,7 @@ import { StatusBadge } from '@/components/status-badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { overviewQueryOptions } from '@/features/overview/overview-api.js'
 import { cn } from '@/lib/utils.js'
+import { getWhatsAppUrl } from '@/lib/whatsapp.js'
 
 const qualityPresentation = {
   NORMAL: { label: 'Normal', tone: 'healthy' },
@@ -39,6 +40,11 @@ function freshness(updatedAt) {
 
 function stepAction(step) {
   return `${actions[step.actionType]} ${step.batchCode}${step.resource ? ` ${step.actionType === 'DISPATCH' ? 'to' : step.actionType === 'LOAD' ? 'into' : 'in'} ${step.resource}` : ''}`
+}
+
+function AlertWhatsAppButton({ alert }) {
+  const url = getWhatsAppUrl(`Hello SIRIP, I need help with alert "${alert.title}" (ID ${alert.id}).`)
+  return url ? <Button className="max-[780px]:col-span-full max-[780px]:w-full" asChild><a href={url} target="_blank" rel="noreferrer"><MessageCircle size={17} />Open WhatsApp</a></Button> : <Button className="max-[780px]:col-span-full max-[780px]:w-full" type="button" disabled title="Set VITE_WHATSAPP_URL to enable WhatsApp."><MessageCircle size={17} />Open WhatsApp</Button>
 }
 
 export function OverviewPage() {
@@ -102,6 +108,7 @@ export function OverviewPage() {
                   </li>
                 })}
               </ol>
+              <Button className="mt-4 w-full" variant="outline" asChild><Link to="/plans">View full plan</Link></Button>
             </>
           ) : <div className="flex min-h-48 flex-col items-center justify-center gap-2 text-center text-muted-foreground"><strong className="text-sm text-foreground">No active plan</strong><span className="text-xs">Approved plans will appear here.</span></div>}
         </Appear>
@@ -112,7 +119,7 @@ export function OverviewPage() {
           <AlertTriangle className="self-center" size={20} aria-hidden="true" />
           <div className="text-foreground"><strong className="block text-sm">{alert.title}</strong><span className="mt-1 block text-xs text-muted-foreground">{alert.description} · {new Date(alert.occurredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
           <StatusBadge className="max-[560px]:col-start-2" tone={alert.severity === 'CRITICAL' ? 'critical' : 'warning'}>{alert.severity === 'CRITICAL' ? 'Critical' : 'Warning'}</StatusBadge>
-          <Button className="max-[780px]:col-span-full max-[780px]:w-full" asChild><a href="https://wa.me/" target="_blank" rel="noreferrer"><MessageCircle size={17} />Open WhatsApp</a></Button>
+          <AlertWhatsAppButton alert={alert} />
         </Appear>
       )) : <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-green-200 bg-green-50 px-[18px] py-4 text-muted-foreground max-[560px]:items-start max-[560px]:flex-col"><strong className="text-sm text-foreground">No active alerts</strong><span className="text-xs">Operations currently require no exception response.</span></div>}
 
