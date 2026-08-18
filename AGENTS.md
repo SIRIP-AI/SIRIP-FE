@@ -11,6 +11,7 @@ Read only the documents relevant to the task, then use `SIRIP AI Master.md` to r
 | Product scope, actors, or terminology | `../docs/SIRIP AI Master.md` |
 | Screens, navigation, visual design, responsive behavior, or UX copy | `../docs/SIRIP AI UIUX.md` |
 | User flows, lifecycle, telemetry, quality, plans, or operational rules | `../docs/SIRIP AI Flow.md` |
+| Browser-to-ESP32 provisioning protocol | `../docs/SIRIP BLE Provisioning.md` |
 | API models, fields, relationships, or statuses | `../docs/SIRIP AI Data.md` |
 | AI states, planning/replanning behavior, or WhatsApp actions | `../docs/SIRIP AI Agent.md` |
 

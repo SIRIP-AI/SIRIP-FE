@@ -70,6 +70,15 @@ export const sensorInputSchema = z.object({
   provisioningStatus: z.enum(sensorProvisioningStatuses),
 })
 
+const utf8Length = (value) => new TextEncoder().encode(value).byteLength
+
+export const sensorProvisioningFormSchema = z.object({
+  code: z.string().trim().min(1, 'Sensor ID is required').refine((value) => utf8Length(value) <= 100, 'Sensor ID must be at most 100 UTF-8 bytes'),
+  wifiSsid: z.string().min(1, 'Wi-Fi SSID is required').refine((value) => utf8Length(value) <= 32, 'Wi-Fi SSID must be at most 32 UTF-8 bytes'),
+  wifiPassword: z.string().refine((value) => value.length === 0 || value.length >= 8, 'Wi-Fi password must be empty or at least 8 characters').refine((value) => utf8Length(value) <= 63, 'Wi-Fi password must be at most 63 UTF-8 bytes'),
+  backendUrl: z.string().trim().min(1, 'Backend URL is required').refine((value) => utf8Length(value) <= 255, 'Backend URL must be at most 255 UTF-8 bytes'),
+})
+
 const sensorSchema = sensorInputSchema.safeExtend({
   id: z.string(),
   status: z.enum(['AVAILABLE', 'ASSIGNED', 'OFFLINE', 'ERROR']),
@@ -77,6 +86,12 @@ const sensorSchema = sensorInputSchema.safeExtend({
   lastSeenAt: z.string().datetime().nullable(),
   createdAt: z.string().datetime(),
   assignment: z.object({ batchCode: z.string(), lastSyncedAt: z.string().datetime().nullable() }).nullable(),
+})
+
+const temperatureReadingSchema = z.object({
+  temperatureC: z.number(),
+  measuredAt: z.string().datetime(),
+  receivedAt: z.string().datetime(),
 })
 
 const resources = {
@@ -119,6 +134,10 @@ export async function listSensorAssignmentOptions() {
   return z.array(batchOptionSchema).parse((await api.get('/api/sensor-assignment-options')).data)
 }
 
+export async function listSensorReadings(id) {
+  return z.array(temperatureReadingSchema).max(100).parse((await api.get(`/api/sensors/${id}/readings`)).data)
+}
+
 export async function assignSensor(id, batchCode) {
   return sensorSchema.parse((await api.post(`/api/sensors/${id}/assignment`, { batchCode })).data)
 }
@@ -129,7 +148,7 @@ export async function unassignSensor(id) {
 
 const diagnosticsSchema = z.object({
   sensor: sensorSchema,
-  latestReading: z.object({ temperatureC: z.number(), measuredAt: z.string().datetime(), receivedAt: z.string().datetime() }).nullable(),
+  latestReading: temperatureReadingSchema.nullable(),
   lastSyncedAt: z.string().datetime().nullable(),
   sessionStatus: z.enum(['ACTIVE', 'COMPLETED']).nullable(),
 })
