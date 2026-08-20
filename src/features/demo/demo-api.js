@@ -12,8 +12,26 @@ const demoResultSchema = z.object({
   remainingQualityWindowDays: z.number(),
 })
 
+const demoResetResultSchema = z.strictObject({
+  resetAt: z.string().datetime(),
+  deleted: z.strictObject({
+    fishingTrips: z.number().int().nonnegative(),
+    batches: z.number().int().nonnegative(),
+    plans: z.number().int().nonnegative(),
+    sensors: z.number().int().nonnegative(),
+    telemetry: z.number().int().nonnegative(),
+    alerts: z.number().int().nonnegative(),
+  }),
+  restored: z.strictObject({ resources: z.number().int().nonnegative() }),
+  sessionPreserved: z.literal(true),
+})
+
 export async function loadDemoData() {
   return demoResultSchema.parse((await api.post('/api/debug/demo')).data)
+}
+
+export async function resetDemoAccount() {
+  return demoResetResultSchema.parse((await api.post('/api/debug/demo/reset')).data)
 }
 
 export function demoError(error) {

@@ -26,6 +26,7 @@ function apiError(error) { return error?.response?.data?.error ?? error?.message
 function statusBadge(status) {
   if (status === 'ACTIVE') return <StatusBadge tone="healthy">Active</StatusBadge>
   if (status === 'PROPOSED') return <StatusBadge className="bg-sky-50 text-sky-700">Proposed</StatusBadge>
+  if (status === 'COMPLETED') return <StatusBadge>Completed</StatusBadge>
   if (status === 'DISMISSED') return <StatusBadge tone="critical">Dismissed</StatusBadge>
   return <StatusBadge>Superseded</StatusBadge>
 }
@@ -79,7 +80,7 @@ export function PlansPage() {
       {(data.activePlans.length > 0 || data.proposedPlans.length > 0 || data.history.length > 0) && <>
         <PlanSection title="Active plans" description="Approved plans currently guiding their scoped batches." count={`${data.activePlans.length} active`} plans={data.activePlans} empty="No active plans" />
         <PlanSection title="Proposed plans" description="Review, approve, or dismiss proposals before they guide operations." count={`${data.proposedPlans.length} awaiting review`} plans={data.proposedPlans} empty="No proposed plans" />
-        <PlanSection title="Plan history" description="Superseded and dismissed plans remain available for reference." count={`${data.history.length} stored`} plans={data.history} empty="No plan history yet" />
+        <PlanSection title="Plan history" description="Completed, superseded, and dismissed plans remain available for reference." count={`${data.history.length} stored`} plans={data.history} empty="No plan history yet" />
       </>}
     </div>}
     {creating && <CreatePlanDialog activePlans={data?.activePlans ?? []} onClose={() => setCreating(false)} />}
@@ -116,11 +117,12 @@ function RevisionForm({ plan }) {
 
 export function PlanDetailsPage() {
   const { planId } = useParams(); const navigate = useNavigate(); const queryClient = useQueryClient(); const planQuery = useQuery(planQueryOptions(planId)); const plan = planQuery.data
-  const completion = useMutation({ mutationFn: ({ planId: id, stepId }) => completePlanStep(id, stepId), onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['plans'] }), queryClient.invalidateQueries({ queryKey: ['overview'] })]) } })
+  const completion = useMutation({ mutationFn: ({ planId: id, stepId }) => completePlanStep(id, stepId), onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['plans'] }), queryClient.invalidateQueries({ queryKey: ['overview'] }), queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['batches'] })]) } })
   const completed = plan?.steps.filter((step) => step.status === 'COMPLETED') ?? []; const future = plan?.steps.filter((step) => step.status !== 'COMPLETED') ?? []
   return <div className="mx-auto w-full max-w-[980px] px-8 pt-10 pb-8 max-[780px]:px-4 max-[780px]:py-6"><Button className="mb-5" variant="ghost" onClick={() => navigate('/plans')}><ArrowLeft />All plans</Button><QueryState query={planQuery} label="plan" />
     {plan && <div className="grid gap-5"><header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">Plan V{plan.version}</h1>{statusBadge(plan.status)}</div><p className="mt-2 max-w-2xl font-semibold leading-relaxed">{plan.reason}</p><p className="mt-2 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}</p></div><div className="text-right"><strong className="text-2xl">{completed.length}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div></div><div className="mt-5 flex flex-wrap gap-2" aria-label="Scoped batches">{plan.batches.map((batch) => <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold" key={batch.id}>{batch.code}</span>)}</div></header>
       {plan.status === 'PROPOSED' && <ReviewActions plan={plan} />}
+      {plan.status === 'COMPLETED' && <p className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary" role="status">Completed {formatDateTime(plan.completedAt)}. Its batches are available for new plans.</p>}
       <section className="overflow-hidden rounded-xl border border-border bg-card"><header className="border-b border-border p-5"><h2 className="text-sm font-bold">Completed steps</h2><p className="mt-1 text-xs text-muted-foreground">Historical facts are preserved in every revision.</p></header><PlanSteps plan={{ ...plan, steps: completed }} /></section>
       <section className="overflow-hidden rounded-xl border border-border bg-card"><header className="border-b border-border p-5"><h2 className="text-sm font-bold">Future steps</h2><p className="mt-1 text-xs text-muted-foreground">Upcoming and canceled work for the plan’s scoped batches.</p></header><PlanSteps plan={{ ...plan, steps: future }} completion={plan.status === 'ACTIVE' ? completion : undefined} />{completion.isError && <div className="m-5"><ErrorMessage error={completion.error} /></div>}</section>
       {(plan.status === 'ACTIVE' || plan.status === 'PROPOSED') && <RevisionForm plan={plan} />}

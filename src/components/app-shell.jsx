@@ -18,11 +18,21 @@ import { getWhatsAppUrl } from '@/lib/whatsapp.js'
 import { DemoTrigger } from '@/features/demo/demo-trigger.jsx'
 
 const navigation = [
-  { label: 'Overview', icon: LayoutDashboard, path: '/' },
-  { label: 'Resources', icon: Blocks, path: '/resources' },
-  { label: 'Fishing Trips', icon: Ship, path: '/fishing-trips' },
-  { label: 'Batches', icon: Boxes, path: '/batches' },
-  { label: 'Plans', icon: Route, path: '/plans' },
+  {
+    label: 'Operations',
+    items: [
+      { label: 'Overview', icon: LayoutDashboard, path: '/' },
+      { label: 'Plans', icon: Route, path: '/plans' },
+    ],
+  },
+  {
+    label: 'Setup',
+    items: [
+      { label: 'Resources', icon: Blocks, path: '/resources' },
+      { label: 'Fishing Trips', icon: Ship, path: '/fishing-trips' },
+      { label: 'Batches', icon: Boxes, path: '/batches' },
+    ],
+  },
 ]
 
 function initials(name) {
@@ -32,7 +42,7 @@ function initials(name) {
 function Sidebar({ isMobile, open, closeButtonRef, onClose, user, onLogout, logoutPending }) {
   return (
     <aside
-      className={cn('fixed inset-y-0 left-0 z-40 flex w-60 flex-col border-r border-border bg-card px-4 pt-6 pb-[18px] max-[780px]:w-[min(86vw,300px)] max-[780px]:-translate-x-[102%] max-[780px]:shadow-[18px_0_55px_rgb(2_40_88_/_16%)] max-[780px]:transition-transform max-[780px]:duration-[250ms]', open && 'max-[780px]:translate-x-0')}
+      className={cn('fixed inset-y-0 left-0 z-40 flex w-60 flex-col overflow-y-auto border-r border-border bg-card px-4 pt-6 pb-[18px] max-[780px]:w-[min(86vw,300px)] max-[780px]:-translate-x-[102%] max-[780px]:shadow-[18px_0_55px_rgb(2_40_88_/_16%)] max-[780px]:transition-transform max-[780px]:duration-[250ms]', open && 'max-[780px]:translate-x-0')}
       aria-label="Primary navigation"
       aria-hidden={isMobile && !open}
       inert={isMobile && !open ? true : undefined}
@@ -42,15 +52,24 @@ function Sidebar({ isMobile, open, closeButtonRef, onClose, user, onLogout, logo
         <Button ref={closeButtonRef} className="ml-auto hidden max-[780px]:inline-flex" variant="outline" size="icon" type="button" onClick={onClose} aria-label="Close sidebar"><X size={20} /></Button>
       </div>
 
-      <nav className="flex flex-col gap-1">
-        {navigation.map(({ label, icon: Icon, path }) => (
-          <NavLink key={label} className={({ isActive }) => cn('flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-[520] text-slate-600 no-underline transition-colors hover:bg-slate-100 hover:text-foreground', isActive && 'bg-primary/10 text-primary')} end={path === '/'} to={path} onClick={onClose}>
-            <Icon size={19} />{label}
-          </NavLink>
+      <nav className="flex flex-col gap-5">
+        {navigation.map((section) => (
+          <div key={section.label}>
+            <h2 className="mb-1.5 px-3 text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">{section.label}</h2>
+            <div className="flex flex-col gap-1">
+              {section.items.map(({ label, icon: Icon, path }) => (
+                <NavLink key={label} className={({ isActive }) => cn('flex min-h-11 items-center gap-3 rounded-lg px-3 text-sm font-[520] text-slate-600 no-underline transition-colors hover:bg-slate-100 hover:text-foreground', isActive && 'bg-primary/10 text-primary')} end={path === '/'} to={path} onClick={onClose}>
+                  <Icon size={19} />{label}
+                </NavLink>
+              ))}
+            </div>
+          </div>
         ))}
       </nav>
 
-      <div className="mt-auto flex items-center gap-2.5 border-t border-border px-2 pt-3">
+      <div className="mt-auto" />
+      {user.email === 'adi.rahman@sirip.id' && <DemoTrigger />}
+      <div className="flex items-center gap-2.5 border-t border-border px-2 pt-3">
         <span className="grid size-[34px] shrink-0 place-items-center rounded-full bg-foreground text-[11px] font-bold text-white">{initials(user.name)}</span>
         <div className="min-w-0"><strong className="block truncate text-xs">{user.name}</strong><span className="mt-0.5 block text-[11px] text-muted-foreground">Operations coordinator</span></div>
         <Button className="ml-auto shrink-0" variant="ghost" size="icon-sm" type="button" onClick={onLogout} disabled={logoutPending} aria-label="Sign out"><LogOut size={16} /></Button>
@@ -145,7 +164,6 @@ export function AppShell({ user, onLogout, logoutPending }) {
         </header>
         <Outlet />
       </main>
-      <DemoTrigger />
     </div>
   )
 }

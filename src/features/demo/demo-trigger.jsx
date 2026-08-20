@@ -1,45 +1,48 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-import { FlaskConical, LoaderCircle } from 'lucide-react'
+import { FlaskConical, LoaderCircle, RotateCcw, TriangleAlert } from 'lucide-react'
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { Button } from '@/components/ui/button.jsx'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
-import { demoError, loadDemoData } from './demo-api.js'
+import { demoError, loadDemoData, resetDemoAccount } from './demo-api.js'
+
+const refreshedQueries = ['overview', 'resources', 'batches', 'fishing-trips', 'plans', 'auth']
 
 export function DemoTrigger() {
-  const [open, setOpen] = useState(false)
+  const [dialog, setDialog] = useState(null)
   const queryClient = useQueryClient()
   const navigate = useNavigate()
-  const mutation = useMutation({
+  const invalidateDemoQueries = () => Promise.all(refreshedQueries.map((queryKey) => queryClient.invalidateQueries({ queryKey: [queryKey] })))
+  const loadMutation = useMutation({
     mutationFn: loadDemoData,
-    onSuccess: () => Promise.all([
-      queryClient.invalidateQueries({ queryKey: ['overview'] }),
-      queryClient.invalidateQueries({ queryKey: ['resources'] }),
-      queryClient.invalidateQueries({ queryKey: ['batches'] }),
-      queryClient.invalidateQueries({ queryKey: ['fishing-trips'] }),
-    ]),
+    onSuccess: invalidateDemoQueries,
+  })
+  const resetMutation = useMutation({
+    mutationFn: resetDemoAccount,
+    onSuccess: async () => {
+      await invalidateDemoQueries()
+      setDialog(null)
+      navigate('/')
+    },
   })
 
   const close = () => {
-    if (mutation.isPending) return
-    setOpen(false)
-    mutation.reset()
+    if (loadMutation.isPending || resetMutation.isPending) return
+    setDialog(null)
+    loadMutation.reset()
+    resetMutation.reset()
   }
 
   return (
     <>
-      <Button
-        className="fixed right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(max(1rem,env(safe-area-inset-bottom))+4.5rem)] z-40 h-12 rounded-full border-2 border-white/70 bg-[#063b73] px-5 shadow-[0_12px_32px_rgb(2_40_88_/_28%)] hover:bg-[#0a4b8d] max-[520px]:size-12 max-[520px]:px-0"
-        type="button"
-        onClick={() => setOpen(true)}
-        aria-label="Load demo sensor data"
-      >
-        <FlaskConical className="size-5" />
-        <span className="max-[520px]:sr-only">Load demo data</span>
-      </Button>
+      <div className="flex flex-col gap-2 border-t border-border px-2 py-3" aria-label="Demo account actions">
+        <span className="text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">Demo tools</span>
+        <Button className="w-full" size="sm" type="button" onClick={() => setDialog('load')}><FlaskConical />Load demo data</Button>
+        <Button className="w-full" variant="destructive-outline" size="sm" type="button" onClick={() => setDialog('reset')}><RotateCcw />Reset demo account</Button>
+      </div>
 
-      <Dialog open={open} onOpenChange={(nextOpen) => !nextOpen && close()}>
+      <Dialog open={dialog === 'load'} onOpenChange={(open) => !open && close()}>
         <DialogContent className="max-w-[440px] overflow-hidden p-6">
           <div className="absolute inset-x-0 top-0 h-1 bg-[repeating-linear-gradient(90deg,#f5b942_0_12px,#063b73_12px_24px)]" />
           <DialogHeader>
@@ -49,22 +52,41 @@ export function DemoTrigger() {
             </DialogDescription>
           </DialogHeader>
 
-          {mutation.isError && <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">{demoError(mutation.error)}</p>}
-          {mutation.data && (
+          {loadMutation.isError && <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">{demoError(loadMutation.error)}</p>}
+          {loadMutation.data && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4" role="status">
               <strong className="block text-sm">Demo pipeline completed</strong>
-              <p className="mt-1 text-sm text-muted-foreground">{mutation.data.sensor.code} sent {mutation.data.readingCount} readings to {mutation.data.batch.code}. Latest temperature: {mutation.data.currentTemperatureC.toFixed(1)}°C.</p>
+              <p className="mt-1 text-sm text-muted-foreground">{loadMutation.data.sensor.code} sent {loadMutation.data.readingCount} readings to {loadMutation.data.batch.code}. Latest temperature: {loadMutation.data.currentTemperatureC.toFixed(1)}°C.</p>
             </div>
           )}
 
           <DialogFooter className="-mx-6 -mb-6 px-6">
-            <Button variant="outline" type="button" onClick={close} disabled={mutation.isPending}>{mutation.data ? 'Close' : 'Cancel'}</Button>
-            {mutation.data
+            <Button variant="outline" type="button" onClick={close} disabled={loadMutation.isPending}>{loadMutation.data ? 'Close' : 'Cancel'}</Button>
+            {loadMutation.data
               ? <Button type="button" onClick={() => { close(); navigate('/') }}>View overview</Button>
-              : <Button type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
-                  {mutation.isPending ? <LoaderCircle className="animate-spin" /> : <FlaskConical />}
-                  {mutation.isPending ? 'Generating…' : 'Generate demo data'}
+              : <Button type="button" onClick={() => loadMutation.mutate()} disabled={loadMutation.isPending}>
+                  {loadMutation.isPending ? <LoaderCircle className="animate-spin" /> : <FlaskConical />}
+                  {loadMutation.isPending ? 'Generating…' : 'Generate demo data'}
                 </Button>}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dialog === 'reset'} onOpenChange={(open) => !open && close()}>
+        <DialogContent className="max-w-[460px] p-6">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-lg"><TriangleAlert className="text-destructive" /> Reset demo account?</DialogTitle>
+            <DialogDescription className="leading-relaxed">
+              This permanently deletes this demo account&apos;s trips, batches, plans, sensors, telemetry, and alerts, then restores its seed resources. Your current login is preserved. Other accounts are not affected.
+            </DialogDescription>
+          </DialogHeader>
+          {resetMutation.isError && <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">{demoError(resetMutation.error)}</p>}
+          <DialogFooter className="-mx-6 -mb-6 px-6">
+            <Button variant="outline" type="button" onClick={close} disabled={resetMutation.isPending}>Cancel</Button>
+            <Button variant="destructive" type="button" onClick={() => resetMutation.mutate()} disabled={resetMutation.isPending}>
+              {resetMutation.isPending ? <LoaderCircle className="animate-spin" /> : <RotateCcw />}
+              {resetMutation.isPending ? 'Resetting…' : 'Reset demo account'}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

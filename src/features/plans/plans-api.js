@@ -36,11 +36,12 @@ const stepSchema = z.strictObject({
 const planSchema = z.strictObject({
   id: planIdSchema,
   version: z.number().int().positive(),
-  status: z.enum(['PROPOSED', 'ACTIVE', 'SUPERSEDED', 'DISMISSED']),
+  status: z.enum(['PROPOSED', 'ACTIVE', 'COMPLETED', 'SUPERSEDED', 'DISMISSED']),
   previousPlanId: z.string().nullable(),
   reason: z.string(),
   createdAt: isoDateTimeSchema,
   approvedAt: isoDateTimeSchema.nullable(),
+  completedAt: isoDateTimeSchema.nullable(),
   trigger: triggerSchema.nullable(),
   batches: z.array(z.object({ id: z.string(), code: z.string() })),
   steps: z.array(stepSchema),
