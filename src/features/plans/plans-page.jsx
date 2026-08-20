@@ -8,10 +8,13 @@ import { PageHeader } from '@/components/page-header.jsx'
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
+import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
 import { Textarea } from '@/components/ui/textarea.jsx'
 import { listBatches } from '@/features/batches/batches-api.js'
 import { approvePlan, completePlanStep, createPlanProposal, createPlanRevision, dismissPlan, planQueryOptions, plansQueryOptions } from '@/features/plans/plans-api.js'
+import { listResources } from '@/features/resources/resources-api.js'
 import { sortPlanSteps } from '@/lib/ordering.js'
 import { cn } from '@/lib/utils.js'
 
@@ -21,6 +24,7 @@ const eligibleStatuses = new Set(['MONITORING', 'ACTIVE', 'INSPECTION_HOLD'])
 const dateFormatter = new Intl.DateTimeFormat([], { dateStyle: 'medium', timeStyle: 'short' })
 
 function formatDateTime(value) { return dateFormatter.format(new Date(value)) }
+function localDateTime(value) { const date = new Date(value); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); return date.toISOString().slice(0, 16) }
 function describeStep(step) { return `${actions[step.actionType]} ${step.batch.code}${step.resource ? ` ${prepositions[step.actionType]} ${step.resource.name}` : ''}` }
 function apiError(error) { return error?.response?.data?.error ?? error?.message ?? 'Something went wrong' }
 function statusBadge(status) {
@@ -43,7 +47,7 @@ function PlanCard({ plan }) {
   const completed = steps.filter((step) => step.status === 'COMPLETED').length
   const next = steps.find((step) => step.status === 'UPCOMING')
   return <Appear as="article" className={cn('rounded-xl border bg-card p-5', plan.status === 'PROPOSED' && 'border-sky-200 bg-sky-50/30')}>
-    <div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">Plan V{plan.version}</h3>{statusBadge(plan.status)}</div><p className="mt-2 line-clamp-2 text-sm font-semibold leading-relaxed">{plan.reason}</p><p className="mt-1 text-xs text-muted-foreground">{plan.batches.map((batch) => batch.code).join(', ')}</p></div><Route className="shrink-0 text-primary" size={20} /></div>
+    <div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">Plan V{plan.version}</h3>{statusBadge(plan.status)}</div><p className="mt-2 line-clamp-2 text-sm font-semibold leading-relaxed">{plan.reason}</p><p className="mt-1 text-xs text-muted-foreground">{plan.batches.map((batch) => batch.code).join(', ')}</p><p className="mt-1 text-xs text-muted-foreground">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p></div><Route className="shrink-0 text-primary" size={20} /></div>
     <div className="mt-5"><div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">{next ? `Next · ${formatDateTime(next.scheduledAt)}` : 'No future steps'}</span><strong>{completed}/{steps.length}</strong></div><div className="flex gap-1" aria-label={`${completed} of ${steps.length} steps completed`}>{steps.map((step) => <span className={cn('h-1.5 flex-1 rounded-full', step.status === 'COMPLETED' ? 'bg-primary' : 'bg-slate-200')} key={step.id} />)}</div></div>
     <Button className="mt-5 w-full" variant="outline" asChild><Link to={`/plans/${plan.id}`}>{plan.status === 'PROPOSED' ? 'Review proposal' : 'View plan'}</Link></Button>
   </Appear>
@@ -53,18 +57,30 @@ function CreatePlanDialog({ activePlans, onClose }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [selected, setSelected] = useState([])
+  const [destinationId, setDestinationId] = useState('')
+  const [deadline, setDeadline] = useState('')
+  const [openedAt] = useState(() => Date.now())
   const batches = useQuery({ queryKey: ['batches'], queryFn: listBatches })
+  const destinations = useQuery({ queryKey: ['resources', 'destinations'], queryFn: () => listResources('destinations') })
   const plannedBatchIds = new Set(activePlans.flatMap((plan) => plan.batches.map((batch) => batch.id)))
   const eligible = (batches.data ?? []).filter((batch) => eligibleStatuses.has(batch.status) && !plannedBatchIds.has(batch.id))
-  const mutation = useMutation({ mutationFn: createPlanProposal, onSuccess: async (proposal) => { await queryClient.invalidateQueries({ queryKey: ['plans'] }); onClose(); navigate(`/plans/${proposal.id}`) } })
+  const availableDestinations = (destinations.data ?? []).filter((destination) => destination.status === 'AVAILABLE')
+  const validDeadline = deadline && new Date(deadline).getTime() > openedAt
+  const mutation = useMutation({ mutationFn: createPlanProposal, onSuccess: async (result) => { if (result.status === 'INFEASIBLE') return; await queryClient.invalidateQueries({ queryKey: ['plans'] }); onClose(); navigate(`/plans/${result.proposal.id}`) } })
   function toggle(id) { setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
-  return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-[560px] p-6"><DialogHeader><DialogTitle>Create plan proposal</DialogTitle><DialogDescription>Select the active batches this operation plan should cover.</DialogDescription></DialogHeader>
+  return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-[560px] p-6"><DialogHeader><DialogTitle>Create plan proposal</DialogTitle><DialogDescription>Select the active batches and their delivery destination.</DialogDescription></DialogHeader>
+    {destinations.isPending && <p className="text-sm text-muted-foreground" role="status">Loading destinations…</p>}
+    {destinations.isError && <ErrorMessage error={destinations.error} />}
+    {destinations.isSuccess && availableDestinations.length > 0 && <div className="grid gap-2"><Label htmlFor="plan-destination">Destination</Label><Select value={destinationId} onValueChange={setDestinationId}><SelectTrigger id="plan-destination" className="w-full"><SelectValue placeholder="Select a destination" /></SelectTrigger><SelectContent>{availableDestinations.map((destination) => <SelectItem key={destination.id} value={destination.id}>{destination.name} · {destination.address}</SelectItem>)}</SelectContent></Select></div>}
+    <div className="grid gap-2"><Label htmlFor="plan-deadline">Arrival deadline</Label><Input id="plan-deadline" type="datetime-local" min={localDateTime(openedAt)} value={deadline} onChange={(event) => setDeadline(event.target.value)} required /><p className="text-xs text-muted-foreground">All selected batches must arrive at the destination by this time.</p></div>
+    {destinations.isSuccess && !availableDestinations.length && <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No available destinations are configured.</p>}
     {batches.isPending && <p className="py-8 text-center text-sm text-muted-foreground" role="status">Loading eligible batches…</p>}
     {batches.isError && <ErrorMessage error={batches.error} />}
     {batches.isSuccess && !eligible.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No eligible active batches are available.</p>}
     {eligible.length > 0 && <fieldset className="grid max-h-80 gap-2 overflow-y-auto"><legend className="sr-only">Eligible batches</legend>{eligible.map((batch) => <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-slate-50" key={batch.id}><input className="mt-1 size-4 accent-primary" type="checkbox" checked={selected.includes(batch.id)} onChange={() => toggle(batch.id)} /><span><strong className="block text-sm">{batch.code}</strong><span className="text-xs text-muted-foreground">{batch.weightKg.toLocaleString()} kg · Grade {batch.grade} · {batch.status.replaceAll('_', ' ').toLowerCase()}</span></span></Label>)}</fieldset>}
     {mutation.isError && <ErrorMessage error={mutation.error} />}
-    <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!selected.length || mutation.isPending} onClick={() => mutation.mutate(selected)}>{mutation.isPending ? 'Creating…' : `Create proposal${selected.length ? ` (${selected.length})` : ''}`}</Button></DialogFooter>
+    {mutation.data?.status === 'INFEASIBLE' && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status"><strong className="block">No feasible plan found</strong>{mutation.data.reason}</p>}
+    <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!selected.length || !destinationId || !validDeadline || mutation.isPending} onClick={() => mutation.mutate({ batchIds: selected, destinationId, deadline: new Date(deadline).toISOString() })}>{mutation.isPending ? 'Creating…' : `Create proposal${selected.length ? ` (${selected.length})` : ''}`}</Button></DialogFooter>
   </DialogContent></Dialog>
 }
 
@@ -108,11 +124,11 @@ function ReviewActions({ plan }) {
 
 function RevisionForm({ plan }) {
   const queryClient = useQueryClient(); const navigate = useNavigate(); const [instruction, setInstruction] = useState('')
-  const mutation = useMutation({ mutationFn: () => createPlanRevision(plan.id, instruction), onSuccess: async (proposal) => { await queryClient.invalidateQueries({ queryKey: ['plans'] }); navigate(`/plans/${proposal.id}`) } })
+  const mutation = useMutation({ mutationFn: () => createPlanRevision(plan.id, instruction), onSuccess: async (result) => { if (result.status === 'INFEASIBLE') return; await queryClient.invalidateQueries({ queryKey: ['plans'] }); navigate(`/plans/${result.proposal.id}`) } })
   const description = plan.status === 'ACTIVE'
     ? 'Describe changes to future steps. Completed steps remain locked and the active plan stays unchanged until the revision is approved.'
     : 'Describe changes to this proposal. A replacement proposal will be generated for the same batches.'
-  return <section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">Propose an edit</h2><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p><Label className="sr-only" htmlFor="revision-instruction">Revision instruction</Label><Textarea id="revision-instruction" className="mt-4 min-h-28" value={instruction} maxLength={2000} placeholder="For example: Dispatch batch B-017 tomorrow morning instead." onChange={(event) => setInstruction(event.target.value)} />{mutation.isError && <div className="mt-3"><ErrorMessage error={mutation.error} /></div>}<Button className="mt-3" disabled={!instruction.trim() || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Creating revision…' : 'Create proposed revision'}</Button></section>
+  return <section className="rounded-xl border border-border bg-card p-5"><h2 className="text-sm font-bold">Propose an edit</h2><p className="mt-1 text-xs leading-relaxed text-muted-foreground">{description}</p><Label className="sr-only" htmlFor="revision-instruction">Revision instruction</Label><Textarea id="revision-instruction" className="mt-4 min-h-28" value={instruction} maxLength={2000} placeholder="For example: Dispatch batch B-017 tomorrow morning instead." onChange={(event) => setInstruction(event.target.value)} />{mutation.isError && <div className="mt-3"><ErrorMessage error={mutation.error} /></div>}{mutation.data?.status === 'INFEASIBLE' && <p className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status"><strong className="block">No feasible revision found</strong>{mutation.data.reason}</p>}<Button className="mt-3" disabled={!instruction.trim() || mutation.isPending} onClick={() => mutation.mutate()}>{mutation.isPending ? 'Creating revision…' : 'Create proposed revision'}</Button></section>
 }
 
 export function PlanDetailsPage() {
@@ -120,7 +136,7 @@ export function PlanDetailsPage() {
   const completion = useMutation({ mutationFn: ({ planId: id, stepId }) => completePlanStep(id, stepId), onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['plans'] }), queryClient.invalidateQueries({ queryKey: ['overview'] }), queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['batches'] })]) } })
   const completed = plan?.steps.filter((step) => step.status === 'COMPLETED') ?? []; const future = plan?.steps.filter((step) => step.status !== 'COMPLETED') ?? []
   return <div className="mx-auto w-full max-w-[980px] px-8 pt-10 pb-8 max-[780px]:px-4 max-[780px]:py-6"><Button className="mb-5" variant="ghost" onClick={() => navigate('/plans')}><ArrowLeft />All plans</Button><QueryState query={planQuery} label="plan" />
-    {plan && <div className="grid gap-5"><header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">Plan V{plan.version}</h1>{statusBadge(plan.status)}</div><p className="mt-2 max-w-2xl font-semibold leading-relaxed">{plan.reason}</p><p className="mt-2 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}</p></div><div className="text-right"><strong className="text-2xl">{completed.length}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div></div><div className="mt-5 flex flex-wrap gap-2" aria-label="Scoped batches">{plan.batches.map((batch) => <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold" key={batch.id}>{batch.code}</span>)}</div></header>
+    {plan && <div className="grid gap-5"><header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">Plan V{plan.version}</h1>{statusBadge(plan.status)}</div><p className="mt-2 max-w-2xl font-semibold leading-relaxed">{plan.reason}</p><p className="mt-2 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}</p><p className="mt-1 text-xs font-semibold text-slate-700">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p></div><div className="text-right"><strong className="text-2xl">{completed.length}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div></div><div className="mt-5 flex flex-wrap gap-2" aria-label="Scoped batches">{plan.batches.map((batch) => <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold" key={batch.id}>{batch.code}</span>)}</div></header>
       {plan.status === 'PROPOSED' && <ReviewActions plan={plan} />}
       {plan.status === 'COMPLETED' && <p className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary" role="status">Completed {formatDateTime(plan.completedAt)}. Its batches are available for new plans.</p>}
       <section className="overflow-hidden rounded-xl border border-border bg-card"><header className="border-b border-border p-5"><h2 className="text-sm font-bold">Completed steps</h2><p className="mt-1 text-xs text-muted-foreground">Historical facts are preserved in every revision.</p></header><PlanSteps plan={{ ...plan, steps: completed }} /></section>

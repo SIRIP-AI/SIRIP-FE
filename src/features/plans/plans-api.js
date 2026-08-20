@@ -6,6 +6,7 @@ const isoDateTimeSchema = z.string().datetime({ offset: true })
 const planIdSchema = z.string().regex(/^[1-9]\d*$/)
 const stepIdSchema = z.string().min(1)
 const batchIdSchema = z.string().regex(/^[1-9]\d*$/)
+const destinationIdSchema = z.string().regex(/^[1-9]\d*$/)
 
 const triggerSchema = z.strictObject({
   id: z.string(),
@@ -39,6 +40,7 @@ const planSchema = z.strictObject({
   status: z.enum(['PROPOSED', 'ACTIVE', 'COMPLETED', 'SUPERSEDED', 'DISMISSED']),
   previousPlanId: z.string().nullable(),
   reason: z.string(),
+  deadline: isoDateTimeSchema.nullable(),
   createdAt: isoDateTimeSchema,
   approvedAt: isoDateTimeSchema.nullable(),
   completedAt: isoDateTimeSchema.nullable(),
@@ -46,6 +48,11 @@ const planSchema = z.strictObject({
   batches: z.array(z.object({ id: z.string(), code: z.string() })),
   steps: z.array(stepSchema),
 })
+
+const generationResultSchema = z.discriminatedUnion('status', [
+  z.strictObject({ status: z.literal('FEASIBLE'), proposal: planSchema }),
+  z.strictObject({ status: z.literal('INFEASIBLE'), reason: z.string().min(1) }),
+])
 
 const plansSchema = z.strictObject({
   updatedAt: isoDateTimeSchema,
@@ -68,15 +75,15 @@ export function planQueryOptions(planId) {
   }
 }
 
-export async function createPlanProposal(batchIds) {
-  const input = z.array(batchIdSchema).min(1).parse(batchIds)
-  return planSchema.parse((await api.post('/api/plans/proposals', { batchIds: input })).data)
+export async function createPlanProposal(value) {
+  const input = z.strictObject({ batchIds: z.array(batchIdSchema).min(1), destinationId: destinationIdSchema, deadline: isoDateTimeSchema }).parse(value)
+  return generationResultSchema.parse((await api.post('/api/plans/proposals', input)).data)
 }
 
 export async function createPlanRevision(planId, instruction) {
   const safePlanId = planIdSchema.parse(planId)
   const input = z.string().trim().min(1).max(2000).parse(instruction)
-  return planSchema.parse((await api.post(`/api/plans/${encodeURIComponent(safePlanId)}/revisions`, { instruction: input })).data)
+  return generationResultSchema.parse((await api.post(`/api/plans/${encodeURIComponent(safePlanId)}/revisions`, { instruction: input })).data)
 }
 
 export async function approvePlan(planId) {
