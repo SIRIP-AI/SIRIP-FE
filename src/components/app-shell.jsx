@@ -15,6 +15,7 @@ import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { Button } from '@/components/ui/button.jsx'
 import { cn } from '@/lib/utils.js'
 import { getWhatsAppUrl } from '@/lib/whatsapp.js'
+import { DemoTrigger } from '@/features/demo/demo-trigger.jsx'
 
 const navigation = [
   { label: 'Overview', icon: LayoutDashboard, path: '/' },
@@ -144,6 +145,7 @@ export function AppShell({ user, onLogout, logoutPending }) {
         </header>
         <Outlet />
       </main>
+      <DemoTrigger />
     </div>
   )
 }
