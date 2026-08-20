@@ -11,7 +11,7 @@ const destinationIdSchema = z.string().regex(/^[1-9]\d*$/)
 const triggerSchema = z.strictObject({
   id: z.string(),
   type: z.string(),
-  source: z.enum(['SYSTEM', 'WEB', 'WHATSAPP']),
+  source: z.enum(['SYSTEM', 'WEB', 'WHATSAPP', 'TELEGRAM']),
   message: z.string(),
   occurredAt: isoDateTimeSchema,
 })

@@ -26,6 +26,8 @@ const dateFormatter = new Intl.DateTimeFormat([], { dateStyle: 'medium', timeSty
 function formatDateTime(value) { return dateFormatter.format(new Date(value)) }
 function localDateTime(value) { const date = new Date(value); date.setMinutes(date.getMinutes() - date.getTimezoneOffset()); return date.toISOString().slice(0, 16) }
 function describeStep(step) { return `${actions[step.actionType]} ${step.batch.code}${step.resource ? ` ${prepositions[step.actionType]} ${step.resource.name}` : ''}` }
+function formatSource(source) { return source === 'WHATSAPP' ? 'WhatsApp' : source[0] + source.slice(1).toLowerCase() }
+function invalidatePlanQueries(queryClient) { return Promise.all(['plans', 'overview', 'batches'].map((queryKey) => queryClient.invalidateQueries({ queryKey: [queryKey] }))) }
 function apiError(error) { return error?.response?.data?.error ?? error?.message ?? 'Something went wrong' }
 function statusBadge(status) {
   if (status === 'ACTIVE') return <StatusBadge tone="healthy">Active</StatusBadge>
@@ -48,6 +50,7 @@ function PlanCard({ plan }) {
   const next = steps.find((step) => step.status === 'UPCOMING')
   return <Appear as="article" className={cn('rounded-xl border bg-card p-5', plan.status === 'PROPOSED' && 'border-sky-200 bg-sky-50/30')}>
     <div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">Plan V{plan.version}</h3>{statusBadge(plan.status)}</div><p className="mt-2 line-clamp-2 text-sm font-semibold leading-relaxed">{plan.reason}</p><p className="mt-1 text-xs text-muted-foreground">{plan.batches.map((batch) => batch.code).join(', ')}</p><p className="mt-1 text-xs text-muted-foreground">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p></div><Route className="shrink-0 text-primary" size={20} /></div>
+    {plan.status === 'PROPOSED' && plan.trigger && <div className="mt-4 rounded-lg border border-sky-100 bg-white/70 px-3 py-2"><span className="text-[11px] font-bold uppercase tracking-wide text-sky-800">Trigger · {formatSource(plan.trigger.source)}</span><p className="mt-1 line-clamp-2 text-xs text-slate-700">{plan.trigger.message}</p></div>}
     <div className="mt-5"><div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">{next ? `Next · ${formatDateTime(next.scheduledAt)}` : 'No future steps'}</span><strong>{completed}/{steps.length}</strong></div><div className="flex gap-1" aria-label={`${completed} of ${steps.length} steps completed`}>{steps.map((step) => <span className={cn('h-1.5 flex-1 rounded-full', step.status === 'COMPLETED' ? 'bg-primary' : 'bg-slate-200')} key={step.id} />)}</div></div>
     <Button className="mt-5 w-full" variant="outline" asChild><Link to={`/plans/${plan.id}`}>{plan.status === 'PROPOSED' ? 'Review proposal' : 'View plan'}</Link></Button>
   </Appear>
@@ -66,7 +69,7 @@ function CreatePlanDialog({ activePlans, onClose }) {
   const eligible = (batches.data ?? []).filter((batch) => eligibleStatuses.has(batch.status) && !plannedBatchIds.has(batch.id))
   const availableDestinations = (destinations.data ?? []).filter((destination) => destination.status === 'AVAILABLE')
   const validDeadline = deadline && new Date(deadline).getTime() > openedAt
-  const mutation = useMutation({ mutationFn: createPlanProposal, onSuccess: async (result) => { if (result.status === 'INFEASIBLE') return; await queryClient.invalidateQueries({ queryKey: ['plans'] }); onClose(); navigate(`/plans/${result.proposal.id}`) } })
+  const mutation = useMutation({ mutationFn: createPlanProposal, onSuccess: async (result) => { if (result.status === 'INFEASIBLE') return; await invalidatePlanQueries(queryClient); onClose(); navigate(`/plans/${result.proposal.id}`) } })
   function toggle(id) { setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
   return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-[560px] p-6"><DialogHeader><DialogTitle>Create plan proposal</DialogTitle><DialogDescription>Select the active batches and their delivery destination.</DialogDescription></DialogHeader>
     {destinations.isPending && <p className="text-sm text-muted-foreground" role="status">Loading destinations…</p>}
@@ -118,13 +121,13 @@ function PlanSteps({ plan, completion }) {
 
 function ReviewActions({ plan }) {
   const navigate = useNavigate(); const queryClient = useQueryClient()
-  const mutation = useMutation({ mutationFn: (action) => action === 'approve' ? approvePlan(plan.id) : dismissPlan(plan.id), onSuccess: async () => { await queryClient.invalidateQueries({ queryKey: ['plans'] }); navigate('/plans') } })
+  const mutation = useMutation({ mutationFn: (action) => action === 'approve' ? approvePlan(plan.id) : dismissPlan(plan.id), onSuccess: async () => { await invalidatePlanQueries(queryClient); navigate('/plans') } })
   return <section className="rounded-xl border border-sky-200 bg-sky-50/50 p-5"><h2 className="text-sm font-bold text-sky-950">Review proposal</h2><p className="mt-1 text-xs text-sky-900">Approval activates this plan for its scoped batches. Dismissal keeps it in history.</p>{mutation.isError && <div className="mt-3"><ErrorMessage error={mutation.error} /></div>}<div className="mt-4 flex gap-2"><Button disabled={mutation.isPending} onClick={() => mutation.mutate('approve')}>Approve proposal</Button><Button variant="destructive-outline" disabled={mutation.isPending} onClick={() => mutation.mutate('dismiss')}>Dismiss</Button></div></section>
 }
 
 function RevisionForm({ plan }) {
   const queryClient = useQueryClient(); const navigate = useNavigate(); const [instruction, setInstruction] = useState('')
-  const mutation = useMutation({ mutationFn: () => createPlanRevision(plan.id, instruction), onSuccess: async (result) => { if (result.status === 'INFEASIBLE') return; await queryClient.invalidateQueries({ queryKey: ['plans'] }); navigate(`/plans/${result.proposal.id}`) } })
+  const mutation = useMutation({ mutationFn: () => createPlanRevision(plan.id, instruction), onSuccess: async (result) => { if (result.status === 'INFEASIBLE') return; await invalidatePlanQueries(queryClient); navigate(`/plans/${result.proposal.id}`) } })
   const description = plan.status === 'ACTIVE'
     ? 'Describe changes to future steps. Completed steps remain locked and the active plan stays unchanged until the revision is approved.'
     : 'Describe changes to this proposal. A replacement proposal will be generated for the same batches.'
@@ -133,10 +136,11 @@ function RevisionForm({ plan }) {
 
 export function PlanDetailsPage() {
   const { planId } = useParams(); const navigate = useNavigate(); const queryClient = useQueryClient(); const planQuery = useQuery(planQueryOptions(planId)); const plan = planQuery.data
-  const completion = useMutation({ mutationFn: ({ planId: id, stepId }) => completePlanStep(id, stepId), onSuccess: async () => { await Promise.all([queryClient.invalidateQueries({ queryKey: ['plans'] }), queryClient.invalidateQueries({ queryKey: ['overview'] }), queryClient.invalidateQueries({ queryKey: ['resources'] }), queryClient.invalidateQueries({ queryKey: ['batches'] })]) } })
+  const completion = useMutation({ mutationFn: ({ planId: id, stepId }) => completePlanStep(id, stepId), onSuccess: async () => { await Promise.all([invalidatePlanQueries(queryClient), queryClient.invalidateQueries({ queryKey: ['resources'] })]) } })
   const completed = plan?.steps.filter((step) => step.status === 'COMPLETED') ?? []; const future = plan?.steps.filter((step) => step.status !== 'COMPLETED') ?? []
   return <div className="mx-auto w-full max-w-[980px] px-8 pt-10 pb-8 max-[780px]:px-4 max-[780px]:py-6"><Button className="mb-5" variant="ghost" onClick={() => navigate('/plans')}><ArrowLeft />All plans</Button><QueryState query={planQuery} label="plan" />
     {plan && <div className="grid gap-5"><header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">Plan V{plan.version}</h1>{statusBadge(plan.status)}</div><p className="mt-2 max-w-2xl font-semibold leading-relaxed">{plan.reason}</p><p className="mt-2 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}</p><p className="mt-1 text-xs font-semibold text-slate-700">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p></div><div className="text-right"><strong className="text-2xl">{completed.length}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div></div><div className="mt-5 flex flex-wrap gap-2" aria-label="Scoped batches">{plan.batches.map((batch) => <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold" key={batch.id}>{batch.code}</span>)}</div></header>
+      {plan.status === 'PROPOSED' && plan.trigger && <section className="rounded-xl border border-sky-200 bg-sky-50/50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-sky-800">Proposal trigger</p><p className="mt-2 text-sm font-semibold text-sky-950">{plan.trigger.message}</p><p className="mt-2 text-xs text-sky-900">{formatSource(plan.trigger.source)} · {plan.trigger.type.replaceAll('_', ' ').toLowerCase()} · {formatDateTime(plan.trigger.occurredAt)}</p></section>}
       {plan.status === 'PROPOSED' && <ReviewActions plan={plan} />}
       {plan.status === 'COMPLETED' && <p className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary" role="status">Completed {formatDateTime(plan.completedAt)}. Its batches are available for new plans.</p>}
       <section className="overflow-hidden rounded-xl border border-border bg-card"><header className="border-b border-border p-5"><h2 className="text-sm font-bold">Completed steps</h2><p className="mt-1 text-xs text-muted-foreground">Historical facts are preserved in every revision.</p></header><PlanSteps plan={{ ...plan, steps: completed }} /></section>

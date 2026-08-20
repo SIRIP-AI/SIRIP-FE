@@ -43,20 +43,35 @@ export function DemoTrigger() {
       </div>
 
       <Dialog open={dialog === 'load'} onOpenChange={(open) => !open && close()}>
-        <DialogContent className="max-w-[440px] overflow-hidden p-6">
+        <DialogContent className="max-w-[620px] overflow-hidden p-6">
           <div className="absolute inset-x-0 top-0 h-1 bg-[repeating-linear-gradient(90deg,#f5b942_0_12px,#063b73_12px_24px)]" />
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-lg"><FlaskConical className="text-primary" /> Sensor demo</DialogTitle>
+            <DialogTitle className="flex items-center gap-2 text-lg"><FlaskConical className="text-primary" /> Operations demo</DialogTitle>
             <DialogDescription>
-              Creates a demo trip, batch, sensor, and five readings. Running it again replaces only this account&apos;s demo telemetry.
+              Creates 3 trips, 6 batches, 6 assigned sensors, and 30 readings. Running it again replaces only this account&apos;s demo telemetry.
             </DialogDescription>
           </DialogHeader>
 
           {loadMutation.isError && <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">{demoError(loadMutation.error)}</p>}
           {loadMutation.data && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4" role="status">
-              <strong className="block text-sm">Demo pipeline completed</strong>
-              <p className="mt-1 text-sm text-muted-foreground">{loadMutation.data.sensor.code} sent {loadMutation.data.readingCount} readings to {loadMutation.data.batch.code}. Latest temperature: {loadMutation.data.currentTemperatureC.toFixed(1)}°C.</p>
+              <strong className="block text-sm">Operations demo ready</strong>
+              <p className="mt-1 text-sm text-muted-foreground">{loadMutation.data.trips.length} trips · {loadMutation.data.batches.length} batches · {loadMutation.data.sensors.length} assigned sensors · {loadMutation.data.readingCount} readings</p>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {loadMutation.data.batches.map((batch) => {
+                  const sensor = loadMutation.data.sensors.find(({ batchCode }) => batchCode === batch.code)
+                  return (
+                    <div className="min-w-0 rounded-md border border-border/70 bg-background/70 px-3 py-2" key={batch.id}>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="truncate text-xs font-bold text-foreground">{batch.code}</span>
+                        <span className="shrink-0 text-xs font-semibold">{batch.currentTemperatureC.toFixed(1)}°C</span>
+                      </div>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{batch.tripCode} · {sensor ? `${sensor.code} · ${sensor.readingCount} readings` : 'No sensor'}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{batch.remainingQualityWindowDays.toFixed(1)} days quality window</p>
+                    </div>
+                  )
+                })}
+              </div>
             </div>
           )}
 
