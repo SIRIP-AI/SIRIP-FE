@@ -5,6 +5,7 @@ import { api } from '@/lib/axios.js'
 const isoDateTimeSchema = z.string().datetime({ offset: true })
 const planIdSchema = z.string().regex(/^[1-9]\d*$/)
 const stepIdSchema = z.string().min(1)
+const batchIdSchema = z.string().regex(/^[1-9]\d*$/)
 
 const triggerSchema = z.strictObject({
   id: z.string(),
@@ -41,12 +42,13 @@ const planSchema = z.strictObject({
   createdAt: isoDateTimeSchema,
   approvedAt: isoDateTimeSchema.nullable(),
   trigger: triggerSchema.nullable(),
+  batches: z.array(z.object({ id: z.string(), code: z.string() })),
   steps: z.array(stepSchema),
 })
 
 const plansSchema = z.strictObject({
   updatedAt: isoDateTimeSchema,
-  activePlan: planSchema.nullable(),
+  activePlans: z.array(planSchema),
   proposedPlans: z.array(planSchema),
   history: z.array(planSchema),
 })
@@ -55,6 +57,35 @@ export const plansQueryOptions = {
   queryKey: ['plans'],
   queryFn: async () => plansSchema.parse((await api.get('/api/plans')).data),
   refetchInterval: 30_000,
+}
+
+export function planQueryOptions(planId) {
+  const safePlanId = planIdSchema.parse(planId)
+  return {
+    queryKey: ['plans', safePlanId],
+    queryFn: async () => planSchema.parse((await api.get(`/api/plans/${encodeURIComponent(safePlanId)}`)).data),
+  }
+}
+
+export async function createPlanProposal(batchIds) {
+  const input = z.array(batchIdSchema).min(1).parse(batchIds)
+  return planSchema.parse((await api.post('/api/plans/proposals', { batchIds: input })).data)
+}
+
+export async function createPlanRevision(planId, instruction) {
+  const safePlanId = planIdSchema.parse(planId)
+  const input = z.string().trim().min(1).max(2000).parse(instruction)
+  return planSchema.parse((await api.post(`/api/plans/${encodeURIComponent(safePlanId)}/revisions`, { instruction: input })).data)
+}
+
+export async function approvePlan(planId) {
+  const safePlanId = planIdSchema.parse(planId)
+  return planSchema.parse((await api.post(`/api/plans/${encodeURIComponent(safePlanId)}/approve`)).data)
+}
+
+export async function dismissPlan(planId) {
+  const safePlanId = planIdSchema.parse(planId)
+  return planSchema.parse((await api.post(`/api/plans/${encodeURIComponent(safePlanId)}/dismiss`)).data)
 }
 
 export async function completePlanStep(planId, stepId) {
