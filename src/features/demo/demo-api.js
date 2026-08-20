@@ -21,6 +21,8 @@ const demoResetResultSchema = z.strictObject({
     sensors: z.number().int().nonnegative(),
     telemetry: z.number().int().nonnegative(),
     alerts: z.number().int().nonnegative(),
+    messagingConnections: z.number().int().nonnegative(),
+    messagingLinkTokens: z.number().int().nonnegative(),
   }),
   restored: z.strictObject({ resources: z.number().int().nonnegative() }),
   sessionPreserved: z.literal(true),

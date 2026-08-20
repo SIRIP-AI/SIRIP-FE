@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button.jsx'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
 import { demoError, loadDemoData, resetDemoAccount } from './demo-api.js'
 
-const refreshedQueries = ['overview', 'resources', 'batches', 'fishing-trips', 'plans', 'auth']
+const refreshedQueries = ['overview', 'resources', 'batches', 'fishing-trips', 'plans', 'auth', 'telegram']
 
 export function DemoTrigger() {
   const [dialog, setDialog] = useState(null)
@@ -77,7 +77,7 @@ export function DemoTrigger() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg"><TriangleAlert className="text-destructive" /> Reset demo account?</DialogTitle>
             <DialogDescription className="leading-relaxed">
-              This permanently deletes this demo account&apos;s trips, batches, plans, sensors, telemetry, and alerts, then restores its seed resources. Your current login is preserved. Other accounts are not affected.
+              This permanently deletes this demo account&apos;s trips, batches, plans, sensors, telemetry, alerts, and Telegram connection, then restores its seed resources. Your current login is preserved. Other accounts are not affected.
             </DialogDescription>
           </DialogHeader>
           {resetMutation.isError && <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">{demoError(resetMutation.error)}</p>}
