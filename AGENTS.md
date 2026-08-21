@@ -1,6 +1,6 @@
 # SIRIP Frontend
 
-React 19 and Vite web application for the Landing / Cold-Chain Operations Coordinator. The dashboard provides operational visibility and configuration; WhatsApp remains the AI interaction channel.
+React 19 and Vite web application for the Landing / Cold-Chain Operations Coordinator. The dashboard provides operational visibility, configuration, and all planning actions. Telegram is the operational messaging transport for deterministic alerts and basic monitoring questions; do not build browser chat UI.
 
 ## Documentation Routing
 
@@ -13,7 +13,7 @@ Read only the documents relevant to the task, then use `SIRIP AI Master.md` to r
 | User flows, lifecycle, telemetry, quality, plans, or operational rules | `../docs/SIRIP AI Flow.md` |
 | Browser-to-ESP32 provisioning protocol | `../docs/SIRIP BLE Provisioning.md` |
 | API models, fields, relationships, or statuses | `../docs/SIRIP AI Data.md` |
-| AI states, planning/replanning behavior, or WhatsApp actions | `../docs/SIRIP AI Agent.md` |
+| AI states, planning/replanning behavior, or Telegram interactions | `../docs/SIRIP AI Agent.md` |
 
 When documents overlap, preserve the explicit MVP rules in the most task-specific document and flag material conflicts rather than inventing behavior.
 

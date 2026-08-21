@@ -1,6 +1,6 @@
 import { Children, cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Bluetooth, BluetoothSearching, Check, CheckCircle2, Clock3, Cpu, LoaderCircle, MapPin, Pencil, Plus, RefreshCw, Server, Snowflake, Trash2, Truck, Unplug, Wifi } from 'lucide-react'
+import { AlertTriangle, Bluetooth, BluetoothSearching, Check, CheckCircle2, Clock3, Cpu, LoaderCircle, MapPin, Pencil, Plus, RefreshCw, Server, Snowflake, Trash2, Truck, Unplug, Wifi } from 'lucide-react'
 
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Appear } from '@/components/appear.jsx'
@@ -26,6 +26,7 @@ import {
   listSensorReadings,
   saveResource,
   sensorProvisioningFormSchema,
+  simulateSensorExcursion,
   unassignSensor,
   vehicleInputSchema,
   resourceOperationalStatuses,
@@ -503,6 +504,13 @@ function SensorCard({ resource, onDelete, onAssignment }) {
     enabled: resource.provisioningStatus === 'PROVISIONED',
   })
   const latest = readings.data?.at(-1)
+  const excursion = useMutation({
+    mutationFn: () => simulateSensorExcursion(resource.id),
+    onSuccess: () => Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['resources', 'sensors'] }),
+      queryClient.invalidateQueries({ queryKey: ['overview'] }),
+    ]),
+  })
 
   async function refresh() {
     setRefreshing(true)
@@ -525,7 +533,12 @@ function SensorCard({ resource, onDelete, onAssignment }) {
       {resource.connectivityStatus === 'OFFLINE' && <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">Sensor offline — local recording may continue.</p>}
       <div className="flex items-end justify-between gap-3 border-t border-border pt-3"><span className="text-xs font-medium text-muted-foreground">Latest temp</span><strong className="text-2xl font-bold tracking-[-.035em] tabular-nums">{latest ? `${latest.temperatureC.toFixed(1)}°C` : '—'}</strong></div>
       <dl className="grid gap-2 rounded-lg bg-muted/60 p-3">{[['Provisioning', labels[resource.provisioningStatus]], ['Assignment', resource.assignment?.batchCode ?? 'Unassigned'], ['Latest measured', latest ? new Date(latest.measuredAt).toLocaleString() : 'Never'], ['Latest upload', latest ? new Date(latest.receivedAt).toLocaleString() : resource.assignment?.lastSyncedAt ? new Date(resource.assignment.lastSyncedAt).toLocaleString() : 'Never'], ['Last seen', resource.lastSeenAt ? new Date(resource.lastSeenAt).toLocaleString() : 'Never']].map(([label, value]) => <div className="flex items-center justify-between gap-3 text-xs" key={label}><dt className="text-muted-foreground">{label}</dt><dd className="min-w-0 truncate font-semibold text-foreground" title={value}>{value}</dd></div>)}</dl>
-      <ResourceActions><Button variant="secondary" size="sm" type="button" onClick={onAssignment} disabled={resource.provisioningStatus !== 'PROVISIONED'}><Unplug />{resource.assignment ? 'End assignment' : 'Assign sensor'}</Button><Button variant="destructive-outline" size="sm" type="button" onClick={onDelete}><Trash2 />Delete</Button></ResourceActions>
+      {excursion.isError && <p className="text-xs text-red-700" role="alert">{apiError(excursion.error)}</p>}
+      <div className="mt-auto -mx-5 -mb-5 grid grid-cols-2 gap-2 border-t border-border p-3 px-5">
+        <Button className="col-span-2 w-full" variant="secondary" size="sm" type="button" onClick={onAssignment} disabled={resource.provisioningStatus !== 'PROVISIONED'}><Unplug />{resource.assignment ? 'End assignment' : 'Assign sensor'}</Button>
+        <Button className="min-w-0" variant="outline" size="sm" type="button" onClick={() => excursion.mutate()} disabled={!resource.assignment || resource.provisioningStatus !== 'PROVISIONED' || excursion.isPending}><AlertTriangle />{excursion.isPending ? 'Simulating…' : 'Simulate excursion'}</Button>
+        <Button className="min-w-0" variant="destructive-outline" size="sm" type="button" onClick={onDelete}><Trash2 />Delete</Button>
+      </div>
     </article>
   )
 }

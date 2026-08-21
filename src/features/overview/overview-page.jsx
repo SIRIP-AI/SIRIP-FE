@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query'
-import { AlertTriangle, Check, MessageCircle } from 'lucide-react'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { AlertTriangle, Check, ExternalLink, MessageCircle, Send } from 'lucide-react'
 import { Link } from 'react-router-dom'
 
 import { Appear } from '@/components/appear.jsx'
@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/status-badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
 import { overviewQueryOptions } from '@/features/overview/overview-api.js'
 import { cn } from '@/lib/utils.js'
-import { getWhatsAppUrl } from '@/lib/whatsapp.js'
+import { createTelegramLink, disconnectTelegram, getTelegramStatus, telegramError } from './telegram-api.js'
 
 const qualityPresentation = {
   NORMAL: { label: 'Normal', tone: 'healthy' },
@@ -50,9 +50,28 @@ function stepAction(step) {
   return `${actions[step.actionType]} ${step.batchCode}${step.resource ? ` ${step.actionType === 'DISPATCH' ? 'to' : step.actionType === 'LOAD' ? 'into' : 'in'} ${step.resource}` : ''}`
 }
 
-function AlertWhatsAppButton({ alert }) {
-  const url = getWhatsAppUrl(`Hello SIRIP, I need help with alert "${alert.title}" (${alert.source} event, ID ${alert.id}).`)
-  return url ? <Button className="max-[780px]:col-span-full max-[780px]:w-full" asChild><a href={url} target="_blank" rel="noreferrer"><MessageCircle size={17} />Open WhatsApp</a></Button> : <Button className="max-[780px]:col-span-full max-[780px]:w-full" type="button" disabled title="Set VITE_WHATSAPP_URL to enable WhatsApp."><MessageCircle size={17} />Open WhatsApp</Button>
+function TelegramCard() {
+  const queryClient = useQueryClient()
+  const status = useQuery({ queryKey: ['telegram', 'status'], queryFn: getTelegramStatus, refetchInterval: (query) => query.state.data?.connected ? false : 3000 })
+  const connect = useMutation({
+    mutationFn: createTelegramLink,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['telegram', 'status'] }),
+  })
+  const disconnect = useMutation({ mutationFn: disconnectTelegram, onSuccess: () => queryClient.invalidateQueries({ queryKey: ['telegram', 'status'] }) })
+  const error = status.error ?? connect.error ?? disconnect.error
+  function beginConnect() {
+    const popup = window.open('about:blank', '_blank')
+    connect.mutate(undefined, {
+      onSuccess: ({ url }) => popup ? popup.location.assign(url) : window.location.assign(url),
+      onError: () => popup?.close(),
+    })
+  }
+
+  return <Appear as="section" className="mt-3 flex items-center gap-4 rounded-xl border border-blue-200 bg-blue-50 px-[18px] py-4 max-[640px]:items-start max-[640px]:flex-col" delay={0.18}>
+    <span className="grid size-10 shrink-0 place-items-center rounded-full bg-primary text-white"><Send size={19} /></span>
+    <div className="min-w-0 flex-1"><strong className="block text-sm">{status.data?.connected ? 'SIRIP is connected to Telegram' : 'Get SIRIP alerts on Telegram'}</strong><span className="mt-1 block text-xs leading-relaxed text-muted-foreground">{status.data?.connected ? 'Open the bot to ask about current alerts and sensor status.' : 'Connect once to receive temperature alerts and chat with SIRIP.'}</span>{error && <span className="mt-1 block text-xs text-red-700" role="alert">{telegramError(error)}</span>}</div>
+    {status.data?.connected ? <div className="flex shrink-0 gap-2 max-[640px]:w-full"><Button className="max-[640px]:flex-1" asChild><a href={status.data.botUrl ?? '#'} target="_blank" rel="noreferrer"><MessageCircle />Open bot</a></Button><Button variant="outline" type="button" onClick={() => disconnect.mutate()} disabled={disconnect.isPending}>Disconnect</Button></div> : <Button className="shrink-0 max-[640px]:w-full" type="button" onClick={beginConnect} disabled={connect.isPending || status.isPending}>{connect.isPending ? 'Creating link…' : <><ExternalLink />Connect Telegram</>}</Button>}
+  </Appear>
 }
 
 export function OverviewPage() {
@@ -78,6 +97,8 @@ export function OverviewPage() {
         <div className="flex min-h-[76px] items-center justify-between gap-3 border-l border-border px-5 max-[780px]:min-h-16 max-[780px]:border-t max-[780px]:border-l-0 max-[780px]:px-4"><span className="text-xs text-muted-foreground">Active alerts</span><strong className="text-2xl tracking-[-.035em] text-red-600">{summary.activeAlertCount}</strong></div>
         <div className="flex min-h-[76px] items-center justify-between gap-3 border-l border-border px-5 max-[780px]:min-h-16 max-[780px]:border-t max-[780px]:px-4"><span className="text-xs text-muted-foreground">Active plan</span><strong className="text-2xl tracking-[-.035em]">{summary.activePlanVersion ? `V${summary.activePlanVersion}` : '—'}</strong></div>
       </Appear>
+
+      <TelegramCard />
 
       <div className="mt-3 grid grid-cols-[minmax(0,1.5fr)_minmax(320px,.8fr)] gap-3 max-[1020px]:grid-cols-1">
         <Appear as="section" className="rounded-xl border border-border bg-card p-5 max-[560px]:p-4" delay={0.08}>
@@ -128,7 +149,7 @@ export function OverviewPage() {
           <AlertTriangle className="self-center" size={20} aria-hidden="true" />
           <div className="text-foreground"><strong className="block text-sm">{alert.title}</strong><span className="mt-1 block text-xs text-muted-foreground">{alert.description} · {alert.source.toLowerCase()} · ID {alert.id} · {new Date(alert.occurredAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
           <StatusBadge className="max-[560px]:col-start-2" tone={alert.severity === 'CRITICAL' ? 'critical' : 'warning'}>{alert.severity === 'CRITICAL' ? 'Critical' : 'Warning'}</StatusBadge>
-          <AlertWhatsAppButton alert={alert} />
+          <span />
         </Appear>
       )) : <div className="mt-3 flex items-center justify-between gap-4 rounded-xl border border-green-200 bg-green-50 px-[18px] py-4 text-muted-foreground max-[560px]:items-start max-[560px]:flex-col"><strong className="text-sm text-foreground">No active alerts</strong><span className="text-xs">Operations currently require no exception response.</span></div>}
 

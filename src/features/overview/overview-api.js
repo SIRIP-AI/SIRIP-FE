@@ -40,7 +40,7 @@ const overviewSchema = z.object({
     id: z.string(),
     batchId: z.string().nullable(),
     type: z.string(),
-    source: z.enum(['SYSTEM', 'WEB', 'WHATSAPP']),
+    source: z.enum(['SYSTEM', 'WEB', 'WHATSAPP', 'TELEGRAM']),
     severity: z.enum(['WARNING', 'CRITICAL']),
     title: z.string(),
     description: z.string(),

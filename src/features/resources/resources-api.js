@@ -163,6 +163,10 @@ export async function getSensorDiagnostics(id) {
   return diagnosticsSchema.parse((await api.get(`/api/sensors/${id}/diagnostics`)).data)
 }
 
+export async function simulateSensorExcursion(id) {
+  return z.object({ sensorId: z.string(), readingCount: z.literal(5), temperatures: z.array(z.number()).length(5), generatedAt: z.string().datetime() }).parse((await api.post(`/api/debug/demo/sensors/${id}/excursion`)).data)
+}
+
 export function apiError(error) {
   return error.response?.data?.error ?? error.message ?? 'Something went wrong'
 }
