@@ -25,7 +25,7 @@ const overviewSchema = z.object({
     id: z.string(),
     version: z.number().int().positive(),
     status: z.literal('ACTIVE'),
-    reason: z.string(),
+    summary: z.string(),
     steps: z.array(z.object({
       id: z.string(),
       sequence: z.number().int().positive(),
@@ -33,7 +33,7 @@ const overviewSchema = z.object({
       scheduledAt: z.string().datetime(),
       status: z.enum(['UPCOMING', 'COMPLETED']),
       batchCode: z.string(),
-      resource: z.string().nullable(),
+      resources: z.array(z.string()),
     })),
   }).nullable(),
   alerts: z.array(z.object({
