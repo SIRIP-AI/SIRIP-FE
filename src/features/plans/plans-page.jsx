@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label.jsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
 import { Textarea } from '@/components/ui/textarea.jsx'
 import { listBatches } from '@/features/batches/batches-api.js'
+import { resolvePlanLineage } from '@/features/plans/plan-lineage.js'
 import { approvePlan, completePlanStep, createPlanProposal, createPlanRevision, dismissPlan, planQueryOptions, plansQueryOptions } from '@/features/plans/plans-api.js'
 import { listResources } from '@/features/resources/resources-api.js'
 import { sortPlanSteps } from '@/lib/ordering.js'
@@ -50,13 +51,15 @@ function QueryState({ query, label = 'plans' }) {
   return null
 }
 
-function PlanCard({ plan }) {
+function PlanCard({ plan, plans }) {
   const steps = sortPlanSteps(plan.steps)
+  const lineage = resolvePlanLineage(plan, plans)
   const completed = steps.filter((step) => step.status === 'COMPLETED').length
   const next = steps.find((step) => step.status === 'UPCOMING')
   return <Appear as="article" className={cn('rounded-xl border bg-card p-5', plan.status === 'PROPOSED' && 'border-sky-200 bg-sky-50/30')}>
     <div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">Plan V{plan.version}</h3>{statusBadge(plan.status)}</div><p className="mt-2 line-clamp-2 text-sm font-semibold leading-relaxed">{plan.summary}</p><p className="mt-1 text-xs text-muted-foreground">{plan.batches.map((batch) => batch.code).join(', ')}</p><p className="mt-1 text-xs text-muted-foreground">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p></div><Route className="shrink-0 text-primary" size={20} /></div>
     {plan.status === 'PROPOSED' && plan.trigger && <div className="mt-4 rounded-lg border border-sky-100 bg-white/70 px-3 py-2"><span className="text-[11px] font-bold uppercase tracking-wide text-sky-800">Trigger · {formatSource(plan.trigger.source)}</span><p className="mt-1 line-clamp-2 text-xs text-slate-700">{plan.trigger.message}</p></div>}
+    {lineage && <p className="mt-4 border-l-2 border-primary/30 pl-3 text-xs text-muted-foreground">Revision of <strong className="text-foreground">Plan V{lineage.predecessor.version}</strong> · {lineage.retainedCompletedSteps} completed {lineage.retainedCompletedSteps === 1 ? 'step' : 'steps'} retained</p>}
     <div className="mt-5"><div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">{next ? `Next · ${formatDateTime(next.scheduledAt)}` : 'No future steps'}</span><strong>{completed}/{steps.length}</strong></div><div className="flex gap-1" aria-label={`${completed} of ${steps.length} steps completed`}>{steps.map((step) => <span className={cn('h-1.5 flex-1 rounded-full', step.status === 'COMPLETED' ? 'bg-primary' : 'bg-slate-200')} key={step.id} />)}</div></div>
     <Button className="mt-5 w-full" variant="outline" asChild><Link to={`/plans/${plan.id}`}>{plan.status === 'PROPOSED' ? 'Review proposal' : 'View plan'}</Link></Button>
   </Appear>
@@ -103,17 +106,17 @@ export function PlansPage() {
     {data && <div className="grid gap-8"><p className="text-right text-xs text-muted-foreground">Updated {formatDateTime(data.updatedAt)}</p>
       {!data.activePlans.length && !data.proposedPlans.length && !data.history.length && <div className="rounded-xl border border-dashed border-slate-300 bg-white/60 p-8 text-center"><Route className="mx-auto text-muted-foreground" size={24} /><h2 className="mt-3 font-bold">No plans yet</h2><p className="mt-2 text-sm text-muted-foreground">Create a proposal for one or more active batches.</p><Button className="mt-5" onClick={() => setCreating(true)}><Plus />Create plan</Button></div>}
       {(data.activePlans.length > 0 || data.proposedPlans.length > 0 || data.history.length > 0) && <>
-        <PlanSection title="Active plans" description="Approved plans currently guiding their scoped batches." count={`${data.activePlans.length} active`} plans={data.activePlans} empty="No active plans" />
-        <PlanSection title="Proposed plans" description="Review, approve, or dismiss proposals before they guide operations." count={`${data.proposedPlans.length} awaiting review`} plans={data.proposedPlans} empty="No proposed plans" />
-        <PlanSection title="Plan history" description="Completed, superseded, and dismissed plans remain available for reference." count={`${data.history.length} stored`} plans={data.history} empty="No plan history yet" />
+        <PlanSection title="Active plans" description="Approved plans currently guiding their scoped batches." count={`${data.activePlans.length} active`} plans={data.activePlans} allPlans={data} empty="No active plans" />
+        <PlanSection title="Proposed plans" description="Review, approve, or dismiss proposals before they guide operations." count={`${data.proposedPlans.length} awaiting review`} plans={data.proposedPlans} allPlans={data} empty="No proposed plans" />
+        <PlanSection title="Plan history" description="Completed, superseded, and dismissed plans remain available for reference." count={`${data.history.length} stored`} plans={data.history} allPlans={data} empty="No plan history yet" />
       </>}
     </div>}
     {creating && <CreatePlanDialog activePlans={data?.activePlans ?? []} onClose={() => setCreating(false)} />}
   </div>
 }
 
-function PlanSection({ title, description, count, plans, empty }) {
-  return <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-sm font-bold">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{description}</p></div><span className="text-xs text-muted-foreground">{count}</span></div>{plans.length ? <div className="grid grid-cols-3 gap-3.5 max-[1020px]:grid-cols-2 max-[640px]:grid-cols-1">{plans.map((plan) => <PlanCard key={plan.id} plan={plan} />)}</div> : <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground"><Ship className="mr-2" size={17} />{empty}</div>}</section>
+function PlanSection({ title, description, count, plans, allPlans, empty }) {
+  return <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-sm font-bold">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{description}</p></div><span className="text-xs text-muted-foreground">{count}</span></div>{plans.length ? <div className="grid grid-cols-3 gap-3.5 max-[1020px]:grid-cols-2 max-[640px]:grid-cols-1">{plans.map((plan) => <PlanCard key={plan.id} plan={plan} plans={allPlans} />)}</div> : <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground"><Ship className="mr-2" size={17} />{empty}</div>}</section>
 }
 
 function PlanSteps({ plan, completion }) {
@@ -141,12 +144,13 @@ function RevisionForm({ plan }) {
 }
 
 export function PlanDetailsPage() {
-  const { planId } = useParams(); const navigate = useNavigate(); const queryClient = useQueryClient(); const planQuery = useQuery(planQueryOptions(planId)); const plan = planQuery.data
+  const { planId } = useParams(); const navigate = useNavigate(); const queryClient = useQueryClient(); const planQuery = useQuery(planQueryOptions(planId)); const plansQuery = useQuery(plansQueryOptions); const plan = planQuery.data
   const completion = useMutation({ mutationFn: ({ planId: id, stepId }) => completePlanStep(id, stepId), onSuccess: async () => { await Promise.all([invalidatePlanQueries(queryClient), queryClient.invalidateQueries({ queryKey: ['resources'] })]) } })
-  const completed = plan?.steps.filter((step) => step.status === 'COMPLETED') ?? []; const future = plan?.steps.filter((step) => step.status !== 'COMPLETED') ?? []
+  const completed = plan?.steps.filter((step) => step.status === 'COMPLETED') ?? []; const future = plan?.steps.filter((step) => step.status !== 'COMPLETED') ?? []; const lineage = plan ? resolvePlanLineage(plan, plansQuery.data) : null
   return <div className="mx-auto w-full max-w-[980px] px-8 pt-10 pb-8 max-[780px]:px-4 max-[780px]:py-6"><Button className="mb-5" variant="ghost" onClick={() => navigate('/plans')}><ArrowLeft />All plans</Button><QueryState query={planQuery} label="plan" />
     {plan && <div className="grid gap-5"><header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">Plan V{plan.version}</h1>{statusBadge(plan.status)}</div><p className="mt-2 max-w-2xl font-semibold leading-relaxed">{plan.summary}</p><p className="mt-2 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}</p><p className="mt-1 text-xs font-semibold text-slate-700">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p></div><div className="text-right"><strong className="text-2xl">{completed.length}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div></div><div className="mt-5 flex flex-wrap gap-2" aria-label="Scoped batches">{plan.batches.map((batch) => <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold" key={batch.id}>{batch.code}</span>)}</div></header>
       {plan.status === 'PROPOSED' && plan.trigger && <section className="rounded-xl border border-sky-200 bg-sky-50/50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-sky-800">Proposal trigger</p><p className="mt-2 text-sm font-semibold text-sky-950">{plan.trigger.message}</p><p className="mt-2 text-xs text-sky-900">{formatSource(plan.trigger.source)} · {plan.trigger.type.replaceAll('_', ' ').toLowerCase()} · {formatDateTime(plan.trigger.occurredAt)}</p></section>}
+      {lineage && <section className="rounded-xl border border-border bg-card p-5"><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Plan lineage</p><div className="mt-2 flex flex-wrap items-baseline justify-between gap-2"><Link className="font-bold text-primary underline-offset-4 hover:underline" to={`/plans/${lineage.predecessor.id}`}>Previous plan · V{lineage.predecessor.version}</Link><span className="text-xs text-muted-foreground">{lineage.predecessor.approvedAt ? `Approved ${formatDateTime(lineage.predecessor.approvedAt)}` : 'Not approved'}</span></div><p className="mt-2 text-sm">{lineage.retainedCompletedSteps} completed {lineage.retainedCompletedSteps === 1 ? 'step was' : 'steps were'} retained in this version.</p>{lineage.predecessor.trigger && <div className="mt-3 rounded-lg bg-muted/60 px-3 py-2"><span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Previous trigger · {formatSource(lineage.predecessor.trigger.source)}</span><p className="mt-1 text-xs text-foreground">{lineage.predecessor.trigger.message}</p><p className="mt-1 text-[11px] text-muted-foreground">{formatDateTime(lineage.predecessor.trigger.occurredAt)}</p></div>}</section>}
       {plan.status === 'PROPOSED' && <ReviewActions plan={plan} />}
       {plan.status === 'COMPLETED' && <p className="rounded-xl border border-primary/20 bg-primary/5 p-4 text-sm text-primary" role="status">Completed {formatDateTime(plan.completedAt)}. Its batches are available for new plans.</p>}
       <section className="overflow-hidden rounded-xl border border-border bg-card"><header className="border-b border-border p-5"><h2 className="text-sm font-bold">Completed steps</h2><p className="mt-1 text-xs text-muted-foreground">Historical facts are preserved in every revision.</p></header><PlanSteps plan={{ ...plan, steps: completed }} /></section>

@@ -167,6 +167,10 @@ export async function simulateSensorExcursion(id) {
   return z.object({ sensorId: z.string(), readingCount: z.literal(5), temperatures: z.array(z.number()).length(5), generatedAt: z.string().datetime() }).parse((await api.post(`/api/debug/demo/sensors/${id}/excursion`)).data)
 }
 
+export async function simulateSensorRecovery(id) {
+  return z.object({ sensorId: z.string(), readingCount: z.literal(5), temperatures: z.array(z.number()).length(5), generatedAt: z.string().datetime() }).parse((await api.post(`/api/debug/demo/sensors/${id}/recovery`)).data)
+}
+
 export function apiError(error) {
   return error.response?.data?.error ?? error.message ?? 'Something went wrong'
 }
