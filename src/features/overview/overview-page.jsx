@@ -47,7 +47,8 @@ function snapshotStatus(updatedAt, refetchFailed) {
 }
 
 function stepAction(step) {
-  return `${actions[step.actionType]} ${step.batchCode}${step.resource ? ` ${step.actionType === 'DISPATCH' ? 'to' : step.actionType === 'LOAD' ? 'into' : 'in'} ${step.resource}` : ''}`
+  if (step.actionType === 'DISPATCH') return `Dispatch ${step.batchCode}${step.resources[0] ? ` via ${step.resources[0]}` : ''}${step.resources[1] ? ` to ${step.resources[1]}` : ''}`
+  return `${actions[step.actionType]} ${step.batchCode}${step.resources[0] ? ` ${step.actionType === 'LOAD' ? 'into' : 'in'} ${step.resources[0]}` : ''}`
 }
 
 function TelegramCard() {
@@ -125,7 +126,7 @@ export function OverviewPage() {
           {activePlan ? (
             <>
               <div className="flex min-h-7 items-center justify-between gap-4"><h2 className="text-[17px] font-bold tracking-[-.025em]">Active plan · V{activePlan.version}</h2><StatusBadge tone="healthy">Active</StatusBadge></div>
-              <p className="mt-3.5 mb-[18px] text-xs leading-relaxed text-slate-600">{activePlan.reason}</p>
+              <p className="mt-3.5 mb-[18px] text-xs leading-relaxed text-slate-600">{activePlan.summary}</p>
               <ol className="m-0 list-none p-0">
                 {activePlan.steps.map((step, index) => {
                   const complete = step.status === 'COMPLETED'

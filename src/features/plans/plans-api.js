@@ -29,9 +29,9 @@ const stepSchema = z.strictObject({
   scheduledAt: isoDateTimeSchema,
   status: z.enum(['UPCOMING', 'COMPLETED', 'CANCELED']),
   completedAt: isoDateTimeSchema.nullable(),
-  notes: z.string().nullable(),
+  rationale: z.string().nullable(),
   batch: z.strictObject({ id: z.string(), code: z.string() }),
-  resource: resourceSchema.nullable(),
+  resources: z.array(resourceSchema),
 })
 
 const planSchema = z.strictObject({
@@ -39,7 +39,8 @@ const planSchema = z.strictObject({
   version: z.number().int().positive(),
   status: z.enum(['PROPOSED', 'ACTIVE', 'COMPLETED', 'SUPERSEDED', 'DISMISSED']),
   previousPlanId: z.string().nullable(),
-  reason: z.string(),
+  summary: z.string(),
+  destinationId: destinationIdSchema.nullable(),
   deadline: isoDateTimeSchema.nullable(),
   createdAt: isoDateTimeSchema,
   approvedAt: isoDateTimeSchema.nullable(),
@@ -50,8 +51,8 @@ const planSchema = z.strictObject({
 })
 
 const generationResultSchema = z.discriminatedUnion('status', [
-  z.strictObject({ status: z.literal('FEASIBLE'), proposal: planSchema }),
-  z.strictObject({ status: z.literal('INFEASIBLE'), reason: z.string().min(1) }),
+  z.strictObject({ status: z.literal('PROPOSAL'), proposal: planSchema }),
+  z.strictObject({ status: z.literal('NO_VALID_PROPOSAL_FOUND'), reason: z.string().min(1) }),
 ])
 
 const plansSchema = z.strictObject({
