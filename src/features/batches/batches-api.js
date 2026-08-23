@@ -39,6 +39,7 @@ const batchSchema = z.object({
   qualityEstimateStartedAt: z.string().datetime().nullable(),
   currentTemperatureC: z.number().nullable(),
   activeSensor: z.object({ code: z.string(), status: z.string() }).nullable(),
+  location: z.object({ type: z.enum(['INTAKE', 'COLD_STORAGE', 'VEHICLE', 'DESTINATION']), id: z.string().nullable(), name: z.string() }),
   createdAt: z.string().datetime(),
   updatedAt: z.string().datetime(),
 })
@@ -55,8 +56,8 @@ export async function saveFishingTrip(trip) {
   return fishingTripSchema.parse(response.data)
 }
 
-export async function completeFishingTrip(id) {
-  return fishingTripSchema.parse((await api.post(`/api/fishing-trips/${id}/complete`)).data)
+export async function completeFishingTrip(id, batches) {
+  return z.object({ trip: fishingTripSchema, batches: z.array(z.object({ id: z.string(), code: z.string(), weightKg: z.number(), grade: z.string(), sensorId: z.string() })) }).parse((await api.post(`/api/fishing-trips/${id}/complete`, { batches })).data)
 }
 
 export async function deleteFishingTrip(id) {

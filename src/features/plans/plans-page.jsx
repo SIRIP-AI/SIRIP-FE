@@ -11,11 +11,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.jsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
 import { Textarea } from '@/components/ui/textarea.jsx'
 import { listBatches } from '@/features/batches/batches-api.js'
 import { resolvePlanLineage } from '@/features/plans/plan-lineage.js'
-import { approvePlan, completePlanStep, createPlanProposal, createPlanRevision, dismissPlan, planQueryOptions, plansQueryOptions } from '@/features/plans/plans-api.js'
+import { approvePlan, completePlanStep, createPlanProposal, createPlanRevision, dismissPlan, planQueryOptions, plansQueryOptions, recommendPlanOptions } from '@/features/plans/plans-api.js'
 import { listResources } from '@/features/resources/resources-api.js'
 import { sortPlanSteps } from '@/lib/ordering.js'
 import { cn } from '@/lib/utils.js'
@@ -31,6 +30,7 @@ function describeStep(step) {
   const vehicle = step.resources.find((resource) => resource.type === 'VEHICLE')
   const destination = step.resources.find((resource) => resource.type === 'DESTINATION')
   if (step.actionType === 'RETURN_TO_BASE') return `Return ${vehicle?.name ?? 'vehicle'} to base${destination ? ` from ${destination.name}` : ''}`
+  if (step.actionType === 'HANDOVER') return `Hand over ${step.batch?.code ?? 'batch'}${destination ? ` at ${destination.name}` : ''}`
   if (step.actionType === 'DISPATCH') return `Dispatch ${step.batch?.code ?? 'batch'}${vehicle ? ` via ${vehicle.name}` : ''}${destination ? ` to ${destination.name}` : ''}`
   const resource = step.resources[0]
   return `${actions[step.actionType]} ${step.batch?.code ?? 'batch'}${resource ? ` ${prepositions[step.actionType]} ${resource.name}` : ''}`
@@ -71,7 +71,7 @@ function CreatePlanDialog({ activePlans, onClose }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [selected, setSelected] = useState([])
-  const [destinationId, setDestinationId] = useState('')
+  const [destinationIds, setDestinationIds] = useState([])
   const [deadline, setDeadline] = useState('')
   const [openedAt] = useState(() => Date.now())
   const batches = useQuery({ queryKey: ['batches'], queryFn: listBatches })
@@ -80,21 +80,24 @@ function CreatePlanDialog({ activePlans, onClose }) {
   const eligible = (batches.data ?? []).filter((batch) => eligibleStatuses.has(batch.status) && !plannedBatchIds.has(batch.id))
   const availableDestinations = (destinations.data ?? []).filter((destination) => destination.status === 'AVAILABLE')
   const validDeadline = deadline && new Date(deadline).getTime() > openedAt
+  const recommendationDestinationIds = availableDestinations.map(({ id }) => id)
+  const recommendation = useQuery({ queryKey: ['plan-options', selected, recommendationDestinationIds, deadline], queryFn: () => recommendPlanOptions({ batchIds: selected, destinationIds: recommendationDestinationIds, deadline: new Date(deadline).toISOString() }), enabled: Boolean(selected.length && recommendationDestinationIds.length && validDeadline) })
   const mutation = useMutation({ mutationFn: createPlanProposal, onSuccess: async (result) => { if (result.status === 'NO_VALID_PROPOSAL_FOUND') return; await invalidatePlanQueries(queryClient); onClose(); navigate(`/plans/${result.proposal.id}`) } })
   function toggle(id) { setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
+  function toggleDestination(id) { setDestinationIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
   return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-[560px] p-6"><DialogHeader><DialogTitle>Create plan proposal</DialogTitle><DialogDescription>Select the active batches and their delivery destination.</DialogDescription></DialogHeader>
     {destinations.isPending && <p className="text-sm text-muted-foreground" role="status">Loading destinations…</p>}
     {destinations.isError && <ErrorMessage error={destinations.error} />}
-    {destinations.isSuccess && availableDestinations.length > 0 && <div className="grid gap-2"><Label htmlFor="plan-destination">Destination</Label><Select value={destinationId} onValueChange={setDestinationId}><SelectTrigger id="plan-destination" className="w-full"><SelectValue placeholder="Select a destination" /></SelectTrigger><SelectContent>{availableDestinations.map((destination) => <SelectItem key={destination.id} value={destination.id}>{destination.name} · {destination.address}</SelectItem>)}</SelectContent></Select></div>}
+    {destinations.isSuccess && availableDestinations.length > 0 && <fieldset className="grid gap-2"><legend className="text-sm font-semibold">Acceptable destinations</legend>{availableDestinations.map((destination) => { const option = recommendation.data?.destinations.find(({ id }) => id === destination.id); const best = recommendation.data?.destinations.find(({ feasible }) => feasible)?.id === destination.id; return <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3" key={destination.id}><input className="mt-1 size-4 accent-primary" type="checkbox" checked={destinationIds.includes(destination.id)} onChange={() => toggleDestination(destination.id)} /><span className="min-w-0"><span className="flex flex-wrap items-center gap-2"><strong className="text-sm">{destination.name}</strong>{best && <StatusBadge tone="healthy">Most recommended</StatusBadge>}{option && !option.feasible && <StatusBadge tone="critical">No feasible plan</StatusBadge>}</span><span className="block text-xs text-muted-foreground">{destination.address} · {destination.travelMinutes} min</span>{option && <span className="mt-1 block text-xs text-slate-700">{option.reason}</span>}</span></Label> })}</fieldset>}
     <div className="grid gap-2"><Label htmlFor="plan-deadline">Arrival deadline</Label><Input id="plan-deadline" type="datetime-local" min={localDateTime(openedAt)} value={deadline} onChange={(event) => setDeadline(event.target.value)} required /><p className="text-xs text-muted-foreground">All selected batches must arrive at the destination by this time.</p></div>
     {destinations.isSuccess && !availableDestinations.length && <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No available destinations are configured.</p>}
     {batches.isPending && <p className="py-8 text-center text-sm text-muted-foreground" role="status">Loading eligible batches…</p>}
     {batches.isError && <ErrorMessage error={batches.error} />}
     {batches.isSuccess && !eligible.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No eligible active batches are available.</p>}
-    {eligible.length > 0 && <fieldset className="grid max-h-80 gap-2 overflow-y-auto"><legend className="sr-only">Eligible batches</legend>{eligible.map((batch) => <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-slate-50" key={batch.id}><input className="mt-1 size-4 accent-primary" type="checkbox" checked={selected.includes(batch.id)} onChange={() => toggle(batch.id)} /><span><strong className="block text-sm">{batch.code}</strong><span className="text-xs text-muted-foreground">{batch.weightKg.toLocaleString()} kg · Grade {batch.grade} · {batch.status.replaceAll('_', ' ').toLowerCase()}</span></span></Label>)}</fieldset>}
+    {eligible.length > 0 && <fieldset className="grid max-h-80 gap-2 overflow-y-auto"><legend className="sr-only">Eligible batches</legend>{eligible.map((batch) => { const option = recommendation.data?.batches.find(({ batchId }) => batchId === batch.id); return <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-slate-50" key={batch.id}><input className="mt-1 size-4 accent-primary" type="checkbox" checked={selected.includes(batch.id)} onChange={() => toggle(batch.id)} /><span><span className="flex flex-wrap items-center gap-2"><strong className="text-sm">{batch.code}</strong>{option?.recommended && <StatusBadge tone="warning">Recommended</StatusBadge>}</span><span className="block text-xs text-muted-foreground">{batch.weightKg.toLocaleString()} kg · Grade {batch.grade} · {batch.location.name}</span>{option && <span className="mt-1 block text-xs text-slate-700">{option.reason}</span>}</span></Label> })}</fieldset>}
     {mutation.isError && <ErrorMessage error={mutation.error} />}
     {mutation.data?.status === 'NO_VALID_PROPOSAL_FOUND' && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status"><strong className="block">No valid proposal found</strong>{mutation.data.reason}</p>}
-    <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!selected.length || !destinationId || !validDeadline || mutation.isPending} onClick={() => mutation.mutate({ batchIds: selected, destinationId, deadline: new Date(deadline).toISOString() })}>{mutation.isPending ? 'Creating…' : `Create proposal${selected.length ? ` (${selected.length})` : ''}`}</Button></DialogFooter>
+    <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!selected.length || !destinationIds.length || !validDeadline || mutation.isPending} onClick={() => mutation.mutate({ batchIds: selected, destinationIds, deadline: new Date(deadline).toISOString() })}>{mutation.isPending ? 'Creating…' : `Create proposal${selected.length ? ` (${selected.length})` : ''}`}</Button></DialogFooter>
   </DialogContent></Dialog>
 }
 

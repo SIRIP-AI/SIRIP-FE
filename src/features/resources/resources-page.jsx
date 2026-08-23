@@ -119,10 +119,11 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
     event.preventDefault()
     const formElement = event.currentTarget
     const form = new FormData(formElement)
+    const capacityKg = numericValue(form, 'capacityKg')
     const input = isColdStorage ? {
       name: form.get('name'),
-      capacityKg: numericValue(form, 'capacityKg'),
-      availableCapacityKg: numericValue(form, 'availableCapacityKg'),
+      capacityKg,
+      availableCapacityKg: capacityKg,
       operationalStatus: form.get('operationalStatus'),
     } : isVehicle ? {
       code: form.get('code'),
@@ -162,10 +163,7 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
         {isColdStorage ? (
           <>
             <FormField label="Name" htmlFor="resource-name" error={errors.name}><Input className="h-10" id="resource-name" name="name" defaultValue={resource?.name ?? ''} placeholder="Cold Room 1" autoFocus required aria-invalid={Boolean(errors.name)} /></FormField>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="Total capacity (kg)" htmlFor="capacity-kg" error={errors.capacityKg}><Input className="h-10" id="capacity-kg" name="capacityKg" type="number" min="0.01" step="0.01" defaultValue={resource?.capacityKg ?? ''} required aria-invalid={Boolean(errors.capacityKg)} /></FormField>
-              <FormField label="Available capacity (kg)" htmlFor="available-capacity-kg" error={errors.availableCapacityKg}><Input className="h-10" id="available-capacity-kg" name="availableCapacityKg" type="number" min="0" step="0.01" defaultValue={resource?.availableCapacityKg ?? ''} required aria-invalid={Boolean(errors.availableCapacityKg)} /></FormField>
-            </div>
+            <FormField label="Total capacity (kg)" htmlFor="capacity-kg" error={errors.capacityKg} help="Available capacity is derived from batches physically stored here."><Input className="h-10" id="capacity-kg" name="capacityKg" type="number" min="0.01" step="0.01" defaultValue={resource?.capacityKg ?? ''} required aria-invalid={Boolean(errors.capacityKg)} /></FormField>
             <FormField label="Operational status" htmlFor="storage-status" error={errors.operationalStatus} help={resource?.status === 'FULL' ? 'Status cannot be changed while storage is full.' : undefined}><ResourceSelect id="storage-status" name={resource?.status === 'FULL' ? undefined : 'operationalStatus'} defaultValue={resource?.operationalStatus ?? 'AVAILABLE'} disabled={resource?.status === 'FULL'} options={resourceOperationalStatuses} ariaInvalid={Boolean(errors.operationalStatus)} />{resource?.status === 'FULL' && <input name="operationalStatus" type="hidden" value={resource.operationalStatus} />}</FormField>
           </>
         ) : isVehicle ? (
