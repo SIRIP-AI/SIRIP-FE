@@ -29,10 +29,10 @@ const overviewSchema = z.object({
     steps: z.array(z.object({
       id: z.string(),
       sequence: z.number().int().positive(),
-      actionType: z.enum(['STORE', 'LOAD', 'DISPATCH', 'HANDOVER', 'INSPECT', 'OTHER']),
+      actionType: z.enum(['STORE', 'LOAD', 'DISPATCH', 'RETURN_TO_BASE', 'HANDOVER', 'INSPECT', 'OTHER']),
       scheduledAt: z.string().datetime(),
       status: z.enum(['UPCOMING', 'COMPLETED']),
-      batchCode: z.string(),
+      batchCode: z.string().nullable(),
       resources: z.array(z.string()),
     })),
   }).nullable(),

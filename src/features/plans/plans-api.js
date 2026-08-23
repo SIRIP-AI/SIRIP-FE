@@ -25,12 +25,12 @@ const resourceSchema = z.strictObject({
 const stepSchema = z.strictObject({
   id: stepIdSchema,
   sequence: z.number().int().positive(),
-  actionType: z.enum(['STORE', 'LOAD', 'DISPATCH', 'HANDOVER', 'INSPECT', 'OTHER']),
+  actionType: z.enum(['STORE', 'LOAD', 'DISPATCH', 'RETURN_TO_BASE', 'HANDOVER', 'INSPECT', 'OTHER']),
   scheduledAt: isoDateTimeSchema,
   status: z.enum(['UPCOMING', 'COMPLETED', 'CANCELED']),
   completedAt: isoDateTimeSchema.nullable(),
   rationale: z.string().nullable(),
-  batch: z.strictObject({ id: z.string(), code: z.string() }),
+  batch: z.strictObject({ id: z.string(), code: z.string() }).nullable(),
   resources: z.array(resourceSchema),
 })
 

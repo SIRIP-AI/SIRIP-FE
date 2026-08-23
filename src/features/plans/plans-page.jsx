@@ -19,7 +19,7 @@ import { listResources } from '@/features/resources/resources-api.js'
 import { sortPlanSteps } from '@/lib/ordering.js'
 import { cn } from '@/lib/utils.js'
 
-const actions = { STORE: 'Store', LOAD: 'Load', DISPATCH: 'Dispatch', HANDOVER: 'Hand over', INSPECT: 'Inspect', OTHER: 'Handle' }
+const actions = { STORE: 'Store', LOAD: 'Load', DISPATCH: 'Dispatch', RETURN_TO_BASE: 'Return to base', HANDOVER: 'Hand over', INSPECT: 'Inspect', OTHER: 'Handle' }
 const prepositions = { STORE: 'in', LOAD: 'into', DISPATCH: 'to', HANDOVER: 'at', INSPECT: 'at', OTHER: 'with' }
 const eligibleStatuses = new Set(['MONITORING', 'ACTIVE', 'INSPECTION_HOLD'])
 const dateFormatter = new Intl.DateTimeFormat([], { dateStyle: 'medium', timeStyle: 'short' })
@@ -29,9 +29,10 @@ function localDateTime(value) { const date = new Date(value); date.setMinutes(da
 function describeStep(step) {
   const vehicle = step.resources.find((resource) => resource.type === 'VEHICLE')
   const destination = step.resources.find((resource) => resource.type === 'DESTINATION')
-  if (step.actionType === 'DISPATCH') return `Dispatch ${step.batch.code}${vehicle ? ` via ${vehicle.name}` : ''}${destination ? ` to ${destination.name}` : ''}`
+  if (step.actionType === 'RETURN_TO_BASE') return `Return ${vehicle?.name ?? 'vehicle'} to base${destination ? ` from ${destination.name}` : ''}`
+  if (step.actionType === 'DISPATCH') return `Dispatch ${step.batch?.code ?? 'batch'}${vehicle ? ` via ${vehicle.name}` : ''}${destination ? ` to ${destination.name}` : ''}`
   const resource = step.resources[0]
-  return `${actions[step.actionType]} ${step.batch.code}${resource ? ` ${prepositions[step.actionType]} ${resource.name}` : ''}`
+  return `${actions[step.actionType]} ${step.batch?.code ?? 'batch'}${resource ? ` ${prepositions[step.actionType]} ${resource.name}` : ''}`
 }
 function formatSource(source) { return source === 'WHATSAPP' ? 'WhatsApp' : source[0] + source.slice(1).toLowerCase() }
 function invalidatePlanQueries(queryClient) { return Promise.all(['plans', 'overview', 'batches'].map((queryKey) => queryClient.invalidateQueries({ queryKey: [queryKey] }))) }
@@ -124,7 +125,8 @@ function PlanSteps({ plan, completion }) {
   if (!steps.length) return <p className="p-5 text-center text-sm text-muted-foreground">No steps stored for this plan.</p>
   return <ol className="divide-y divide-border">{steps.map((step, index) => {
     const completed = step.status === 'COMPLETED'; const canceled = step.status === 'CANCELED'; const marking = completion?.isPending && completion.variables?.stepId === step.id
-    return <li className={cn('grid grid-cols-[40px_1fr_auto] items-center gap-3 p-5', (completed || canceled) && 'bg-slate-50 text-slate-500')} key={step.id}><span className={cn('grid size-8 place-items-center rounded-full border text-xs font-bold', completed ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white')}>{completed ? <Check size={15} /> : canceled ? <CircleX size={15} /> : index + 1}</span><div><strong className={cn('block text-sm', canceled && 'line-through')}>{describeStep(step)}</strong><span className="mt-1 block text-xs">{completed ? `Completed ${formatDateTime(step.completedAt)}` : canceled ? 'Canceled' : `Scheduled ${formatDateTime(step.scheduledAt)}`}</span>{step.rationale && <span className="mt-1 block text-xs text-muted-foreground">{step.rationale}</span>}</div>{completion && step.status === 'UPCOMING' && <Button size="sm" variant="outline" disabled={completion.isPending} onClick={() => completion.mutate({ planId: plan.id, stepId: step.id })}><CheckCircle2 />{marking ? 'Marking…' : 'Mark complete'}</Button>}</li>
+    const completionLabel = step.actionType === 'RETURN_TO_BASE' ? 'Mark truck returned' : 'Mark complete'
+    return <li className={cn('grid grid-cols-[40px_1fr_auto] items-center gap-3 p-5', (completed || canceled) && 'bg-slate-50 text-slate-500')} key={step.id}><span className={cn('grid size-8 place-items-center rounded-full border text-xs font-bold', completed ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white')}>{completed ? <Check size={15} /> : canceled ? <CircleX size={15} /> : index + 1}</span><div><strong className={cn('block text-sm', canceled && 'line-through')}>{describeStep(step)}</strong><span className="mt-1 block text-xs">{completed ? `Completed ${formatDateTime(step.completedAt)}` : canceled ? 'Canceled' : `${step.actionType === 'RETURN_TO_BASE' ? 'Expected' : 'Scheduled'} ${formatDateTime(step.scheduledAt)}`}</span>{step.rationale && <span className="mt-1 block text-xs text-muted-foreground">{step.rationale}</span>}</div>{completion && step.status === 'UPCOMING' && <Button size="sm" variant="outline" disabled={completion.isPending} onClick={() => completion.mutate({ planId: plan.id, stepId: step.id })}><CheckCircle2 />{marking ? 'Marking…' : completionLabel}</Button>}</li>
   })}</ol>
 }
 
