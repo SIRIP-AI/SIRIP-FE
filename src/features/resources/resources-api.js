@@ -89,6 +89,13 @@ const sensorSchema = sensorInputSchema.safeExtend({
   assignment: z.object({ batchCode: z.string(), lastSyncedAt: z.string().datetime().nullable() }).nullable(),
 })
 
+export const sensorOfflineResultSchema = z.strictObject({
+  sensorId: z.string(),
+  lastSeenAt: z.string().datetime(),
+  lastSyncedAt: z.string().datetime(),
+  processedAt: z.string().datetime(),
+})
+
 const temperatureReadingSchema = z.object({
   id: z.string(),
   readingUid: z.string(),
@@ -169,6 +176,10 @@ export async function simulateSensorExcursion(id) {
 
 export async function simulateSensorRecovery(id) {
   return z.object({ sensorId: z.string(), readingCount: z.literal(5), temperatures: z.array(z.number()).length(5), generatedAt: z.string().datetime() }).parse((await api.post(`/api/debug/demo/sensors/${id}/recovery`)).data)
+}
+
+export async function simulateSensorOffline(id) {
+  return sensorOfflineResultSchema.parse((await api.post(`/api/debug/demo/sensors/${id}/offline`)).data)
 }
 
 export function apiError(error) {

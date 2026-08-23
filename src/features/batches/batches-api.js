@@ -44,6 +44,13 @@ const batchSchema = z.object({
   updatedAt: z.string().datetime(),
 })
 
+export const batchQualityRiskResultSchema = z.strictObject({
+  sensorId: z.string(),
+  readingCount: z.literal(1),
+  temperatures: z.tuple([z.number()]),
+  generatedAt: z.string().datetime(),
+})
+
 export async function listFishingTrips() {
   return z.array(fishingTripSchema).parse((await api.get('/api/fishing-trips')).data)
 }
@@ -78,6 +85,10 @@ export async function saveBatch(batch) {
 
 export async function deleteBatch(id) {
   await api.delete(`/api/batches/${id}`)
+}
+
+export async function simulateBatchQualityRisk(id) {
+  return batchQualityRiskResultSchema.parse((await api.post(`/api/debug/demo/batches/${id}/quality-risk`)).data)
 }
 
 export function apiError(error) {
