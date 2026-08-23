@@ -43,6 +43,7 @@ const planSchema = z.strictObject({
   previousPlanId: z.string().nullable(),
   summary: z.string(),
   destinationId: destinationIdSchema.nullable(),
+  destinationIds: z.array(destinationIdSchema).nullish().transform((value) => value ?? []),
   deadline: isoDateTimeSchema.nullable(),
   createdAt: isoDateTimeSchema,
   approvedAt: isoDateTimeSchema.nullable(),
@@ -81,11 +82,6 @@ export function planQueryOptions(planId) {
 export async function createPlanProposal(value) {
   const input = z.strictObject({ batchIds: z.array(batchIdSchema).min(1), destinationIds: z.array(destinationIdSchema).min(1), deadline: isoDateTimeSchema }).parse(value)
   return generationResultSchema.parse((await api.post('/api/plans/proposals', input)).data)
-}
-
-export async function recommendPlanOptions(value) {
-  const input = z.strictObject({ batchIds: z.array(batchIdSchema).min(1), destinationIds: z.array(destinationIdSchema).min(1), deadline: isoDateTimeSchema }).parse(value)
-  return z.object({ batches: z.array(z.object({ batchId: z.string(), urgencyRank: z.number(), resourceFlexibility: z.enum(['NONE', 'LOW', 'HIGH']), recommended: z.boolean(), reason: z.string() }).passthrough()), destinations: z.array(z.object({ id: z.string(), feasible: z.boolean(), candidateCount: z.number(), travelMinutes: z.number().nullable(), reason: z.string() })) }).parse((await api.post('/api/plans/options', input)).data)
 }
 
 export async function createPlanRevision(planId, instruction) {
