@@ -18,3 +18,22 @@ export const demoResultSchema = z.strictObject({
   readingCount: z.number().int().positive(),
   generatedAt: z.string().datetime(),
 })
+
+const deletionCount = z.number().int().nonnegative()
+
+export const demoResetResultSchema = z.strictObject({
+  resetAt: z.string().datetime(),
+  deleted: z.strictObject({
+    fishingTrips: deletionCount,
+    batches: deletionCount,
+    plans: deletionCount,
+    sensors: deletionCount,
+    telemetry: deletionCount,
+    alerts: deletionCount,
+    messagingConnections: deletionCount,
+    messagingLinkTokens: deletionCount,
+    messagingConversations: deletionCount,
+  }),
+  restored: z.strictObject({ resources: z.literal(8) }),
+  sessionPreserved: z.literal(true),
+})
