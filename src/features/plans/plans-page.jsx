@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, CheckCircle2, CircleHelp, CircleX, Plus, Route, Ship } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, CheckCircle2, CircleHelp, CircleX, Plus, Route, Ship } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { Appear } from '@/components/appear.jsx'
@@ -14,6 +14,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Textarea } from '@/components/ui/textarea.jsx'
 import { listBatches } from '@/features/batches/batches-api.js'
 import { resolvePlanLineage } from '@/features/plans/plan-lineage.js'
+import { formatDuration } from '@/features/plans/plan-timing.js'
 import { approvePlan, completePlanStep, createPlanProposal, createPlanRevision, dismissPlan, planQueryOptions, plansQueryOptions } from '@/features/plans/plans-api.js'
 import { listResources } from '@/features/resources/resources-api.js'
 import { sortPlanSteps } from '@/lib/ordering.js'
@@ -53,6 +54,21 @@ function QueryState({ query, label = 'plans' }) {
   return null
 }
 
+function DelayWarning({ timing, full = false }) {
+  if (timing.status !== 'DELAYED') return null
+  const critical = timing.reasons.some((reason) => reason.severity === 'CRITICAL')
+  const duration = formatDuration(timing.delayedBySeconds)
+  const colors = critical ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'
+  const iconColor = critical ? 'text-red-600' : 'text-amber-600'
+
+  if (!full) return <div className={cn('mt-4 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-semibold', colors)} role="status"><AlertTriangle className={cn('mt-0.5 shrink-0', iconColor)} size={15} aria-hidden="true" /><span>{critical ? 'Critical delay' : 'Delayed'} by {duration}</span></div>
+
+  return <section className={cn('rounded-xl border p-5', colors)} aria-label={`${critical ? 'Critical' : 'Plan'} delay warning`} role="alert">
+    <div className="flex items-start gap-3"><AlertTriangle className={cn('mt-0.5 shrink-0', iconColor)} size={20} aria-hidden="true" /><div className="min-w-0"><h2 className="text-sm font-bold">{critical ? 'Critical plan delay' : 'Plan delayed'} by {duration}</h2><p className="mt-1 text-xs leading-relaxed">Review every timing constraint before continuing with this plan.</p></div></div>
+    <ul className="mt-4 grid gap-2" aria-label="Deterministic delay reasons">{timing.reasons.map((reason, index) => <li className="rounded-lg bg-white/60 px-3 py-2 text-sm leading-relaxed" key={`${reason.code}-${index}`}><span className="font-bold">{reason.severity === 'CRITICAL' ? 'Critical: ' : 'Warning: '}</span>{reason.message} <span className="whitespace-nowrap font-semibold">Delay: {formatDuration(reason.delaySeconds)}.</span></li>)}</ul>
+  </section>
+}
+
 function PlanCard({ plan, plans }) {
   const steps = sortPlanSteps(plan.steps)
   const lineage = resolvePlanLineage(plan, plans)
@@ -61,6 +77,7 @@ function PlanCard({ plan, plans }) {
   return <Appear as="article" className={cn('rounded-xl border bg-card p-5', plan.status === 'PROPOSED' && 'border-sky-200 bg-sky-50/30')}>
     <div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">Plan V{plan.version}</h3>{statusBadge(plan.status)}</div><p className="mt-2 line-clamp-2 text-sm font-semibold leading-relaxed">{plan.summary}</p><p className="mt-1 text-xs text-muted-foreground">{plan.batches.map((batch) => batch.code).join(', ')}</p><p className="mt-1 text-xs text-muted-foreground">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p></div><Route className="shrink-0 text-primary" size={20} /></div>
     {plan.status === 'PROPOSED' && plan.trigger && <div className="mt-4 rounded-lg border border-sky-100 bg-white/70 px-3 py-2"><span className="text-[11px] font-bold uppercase tracking-wide text-sky-800">Trigger · {formatSource(plan.trigger.source)}</span><p className="mt-1 line-clamp-2 text-xs text-slate-700">{plan.trigger.message}</p></div>}
+    <DelayWarning timing={plan.timing} />
     {lineage && <p className="mt-4 border-l-2 border-primary/30 pl-3 text-xs text-muted-foreground">Revision of <strong className="text-foreground">Plan V{lineage.predecessor.version}</strong> · {lineage.retainedCompletedSteps} completed {lineage.retainedCompletedSteps === 1 ? 'step' : 'steps'} retained</p>}
     <div className="mt-5"><div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">{next ? `Next · ${formatDateTime(next.scheduledAt)}` : 'No future steps'}</span><strong>{completed}/{steps.length}</strong></div><div className="flex gap-1" aria-label={`${completed} of ${steps.length} steps completed`}>{steps.map((step) => <span className={cn('h-1.5 flex-1 rounded-full', step.status === 'COMPLETED' ? 'bg-primary' : 'bg-slate-200')} key={step.id} />)}</div></div>
     <Button className="mt-5 w-full" variant="outline" asChild><Link to={`/plans/${plan.id}`}>{plan.status === 'PROPOSED' ? 'Review proposal' : 'View plan'}</Link></Button>
@@ -161,6 +178,7 @@ export function PlanDetailsPage() {
   const completed = plan?.steps.filter((step) => step.status === 'COMPLETED') ?? []; const future = plan?.steps.filter((step) => step.status !== 'COMPLETED') ?? []; const lineage = plan ? resolvePlanLineage(plan, plansQuery.data) : null
   return <div className="mx-auto w-full max-w-[980px] px-8 pt-10 pb-8 max-[780px]:px-4 max-[780px]:py-6"><Button className="mb-5" variant="ghost" onClick={() => navigate('/plans')}><ArrowLeft />All plans</Button><QueryState query={planQuery} label="plan" />
     {plan && <div className="grid gap-5"><header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">Plan V{plan.version}</h1>{statusBadge(plan.status)}</div><p className="mt-2 max-w-2xl font-semibold leading-relaxed">{plan.summary}</p><p className="mt-2 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}</p><p className="mt-1 text-xs font-semibold text-slate-700">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p><p className="mt-1 text-xs text-muted-foreground">Destination pool · {plan.destinationIds.length || (plan.destinationId ? 1 : 0)} selected</p></div><div className="text-right"><strong className="text-2xl">{completed.length}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div></div><div className="mt-5 flex flex-wrap gap-2" aria-label="Scoped batches">{plan.batches.map((batch) => <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold" key={batch.id}>{batch.code}</span>)}</div></header>
+      <DelayWarning timing={plan.timing} full />
       {plan.status === 'PROPOSED' && plan.trigger && <section className="rounded-xl border border-sky-200 bg-sky-50/50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-sky-800">Proposal trigger</p><p className="mt-2 text-sm font-semibold text-sky-950">{plan.trigger.message}</p><p className="mt-2 text-xs text-sky-900">{formatSource(plan.trigger.source)} · {plan.trigger.type.replaceAll('_', ' ').toLowerCase()} · {formatDateTime(plan.trigger.occurredAt)}</p></section>}
       {lineage && <section className="rounded-xl border border-border bg-card p-5"><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Plan lineage</p><div className="mt-2 flex flex-wrap items-baseline justify-between gap-2"><Link className="font-bold text-primary underline-offset-4 hover:underline" to={`/plans/${lineage.predecessor.id}`}>Previous plan · V{lineage.predecessor.version}</Link><span className="text-xs text-muted-foreground">{lineage.predecessor.approvedAt ? `Approved ${formatDateTime(lineage.predecessor.approvedAt)}` : 'Not approved'}</span></div><p className="mt-2 text-sm">{lineage.retainedCompletedSteps} completed {lineage.retainedCompletedSteps === 1 ? 'step was' : 'steps were'} retained in this version.</p>{lineage.predecessor.trigger && <div className="mt-3 rounded-lg bg-muted/60 px-3 py-2"><span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Previous trigger · {formatSource(lineage.predecessor.trigger.source)}</span><p className="mt-1 text-xs text-foreground">{lineage.predecessor.trigger.message}</p><p className="mt-1 text-[11px] text-muted-foreground">{formatDateTime(lineage.predecessor.trigger.occurredAt)}</p></div>}</section>}
       {plan.status === 'PROPOSED' && <ReviewActions plan={plan} />}

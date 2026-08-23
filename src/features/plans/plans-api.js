@@ -7,6 +7,7 @@ const planIdSchema = z.string().regex(/^[1-9]\d*$/)
 const stepIdSchema = z.string().min(1)
 const batchIdSchema = z.string().regex(/^[1-9]\d*$/)
 const destinationIdSchema = z.string().regex(/^[1-9]\d*$/)
+const vehicleIdSchema = z.string().regex(/^[1-9]\d*$/)
 
 const triggerSchema = z.strictObject({
   id: z.string(),
@@ -36,6 +37,24 @@ const stepSchema = z.strictObject({
   resources: z.array(resourceSchema),
 })
 
+const delayReasonSchema = z.strictObject({
+  code: z.enum(['PLAN_DEADLINE_MISSED', 'QUALITY_DEADLINE_MISSED', 'NEXT_RECEIVING_WINDOW', 'VEHICLE_DELAY', 'VEHICLE_AVAILABILITY', 'RESOURCE_RESERVATION']),
+  severity: z.enum(['WARNING', 'CRITICAL']),
+  batchId: batchIdSchema.nullable(),
+  vehicleId: vehicleIdSchema.nullable(),
+  destinationId: destinationIdSchema.nullable(),
+  targetAt: isoDateTimeSchema.nullable(),
+  feasibleAt: isoDateTimeSchema,
+  delaySeconds: z.number().int().nonnegative(),
+  message: z.string(),
+})
+
+const planTimingSchema = z.strictObject({
+  status: z.enum(['ON_TIME', 'DELAYED']),
+  delayedBySeconds: z.number().int().nonnegative(),
+  reasons: z.array(delayReasonSchema),
+})
+
 const planSchema = z.strictObject({
   id: planIdSchema,
   version: z.number().int().positive(),
@@ -49,6 +68,7 @@ const planSchema = z.strictObject({
   approvedAt: isoDateTimeSchema.nullable(),
   completedAt: isoDateTimeSchema.nullable(),
   trigger: triggerSchema.nullable(),
+  timing: planTimingSchema,
   batches: z.array(z.object({ id: z.string(), code: z.string() })),
   steps: z.array(stepSchema),
 })
