@@ -7,6 +7,7 @@ const planIdSchema = z.string().regex(/^[1-9]\d*$/)
 const stepIdSchema = z.string().min(1)
 const batchIdSchema = z.string().regex(/^[1-9]\d*$/)
 const destinationIdSchema = z.string().regex(/^[1-9]\d*$/)
+const vehicleIdSchema = z.string().regex(/^[1-9]\d*$/)
 
 const triggerSchema = z.strictObject({
   id: z.string(),
@@ -25,13 +26,33 @@ const resourceSchema = z.strictObject({
 const stepSchema = z.strictObject({
   id: stepIdSchema,
   sequence: z.number().int().positive(),
-  actionType: z.enum(['STORE', 'LOAD', 'DISPATCH', 'HANDOVER', 'INSPECT', 'OTHER']),
+  actionType: z.enum(['STORE', 'LOAD', 'DISPATCH', 'RETURN_TO_BASE', 'HANDOVER', 'INSPECT', 'OTHER']),
   scheduledAt: isoDateTimeSchema,
   status: z.enum(['UPCOMING', 'COMPLETED', 'CANCELED']),
   completedAt: isoDateTimeSchema.nullable(),
   rationale: z.string().nullable(),
-  batch: z.strictObject({ id: z.string(), code: z.string() }),
+  timingRationale: z.string().nullish().transform((value) => value ?? null),
+  latestSafeAt: isoDateTimeSchema.nullish().transform((value) => value ?? null),
+  batch: z.strictObject({ id: z.string(), code: z.string() }).nullable(),
   resources: z.array(resourceSchema),
+})
+
+const delayReasonSchema = z.strictObject({
+  code: z.enum(['PLAN_DEADLINE_MISSED', 'QUALITY_DEADLINE_MISSED', 'NEXT_RECEIVING_WINDOW', 'VEHICLE_DELAY', 'VEHICLE_AVAILABILITY', 'RESOURCE_RESERVATION']),
+  severity: z.enum(['WARNING', 'CRITICAL']),
+  batchId: batchIdSchema.nullable(),
+  vehicleId: vehicleIdSchema.nullable(),
+  destinationId: destinationIdSchema.nullable(),
+  targetAt: isoDateTimeSchema.nullable(),
+  feasibleAt: isoDateTimeSchema,
+  delaySeconds: z.number().int().nonnegative(),
+  message: z.string(),
+})
+
+const planTimingSchema = z.strictObject({
+  status: z.enum(['ON_TIME', 'DELAYED']),
+  delayedBySeconds: z.number().int().nonnegative(),
+  reasons: z.array(delayReasonSchema),
 })
 
 const planSchema = z.strictObject({
@@ -41,11 +62,13 @@ const planSchema = z.strictObject({
   previousPlanId: z.string().nullable(),
   summary: z.string(),
   destinationId: destinationIdSchema.nullable(),
+  destinationIds: z.array(destinationIdSchema).nullish().transform((value) => value ?? []),
   deadline: isoDateTimeSchema.nullable(),
   createdAt: isoDateTimeSchema,
   approvedAt: isoDateTimeSchema.nullable(),
   completedAt: isoDateTimeSchema.nullable(),
   trigger: triggerSchema.nullable(),
+  timing: planTimingSchema,
   batches: z.array(z.object({ id: z.string(), code: z.string() })),
   steps: z.array(stepSchema),
 })
@@ -77,7 +100,7 @@ export function planQueryOptions(planId) {
 }
 
 export async function createPlanProposal(value) {
-  const input = z.strictObject({ batchIds: z.array(batchIdSchema).min(1), destinationId: destinationIdSchema, deadline: isoDateTimeSchema }).parse(value)
+  const input = z.strictObject({ batchIds: z.array(batchIdSchema).min(1), destinationIds: z.array(destinationIdSchema).min(1), deadline: isoDateTimeSchema }).parse(value)
   return generationResultSchema.parse((await api.post('/api/plans/proposals', input)).data)
 }
 

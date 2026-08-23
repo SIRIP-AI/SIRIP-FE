@@ -20,6 +20,7 @@ const actions = {
   STORE: 'Store',
   LOAD: 'Load',
   DISPATCH: 'Dispatch',
+  RETURN_TO_BASE: 'Return to base',
   HANDOVER: 'Hand over',
   INSPECT: 'Inspect',
   OTHER: 'Handle',
@@ -47,6 +48,7 @@ function snapshotStatus(updatedAt, refetchFailed) {
 }
 
 function stepAction(step) {
+  if (step.actionType === 'RETURN_TO_BASE') return `Return ${step.resources[0] ?? 'vehicle'} to base${step.resources[1] ? ` from ${step.resources[1]}` : ''}`
   if (step.actionType === 'DISPATCH') return `Dispatch ${step.batchCode}${step.resources[0] ? ` via ${step.resources[0]}` : ''}${step.resources[1] ? ` to ${step.resources[1]}` : ''}`
   return `${actions[step.actionType]} ${step.batchCode}${step.resources[0] ? ` ${step.actionType === 'LOAD' ? 'into' : 'in'} ${step.resources[0]}` : ''}`
 }

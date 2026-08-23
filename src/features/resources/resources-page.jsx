@@ -1,6 +1,6 @@
 import { Children, cloneElement, isValidElement, useEffect, useRef, useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { AlertTriangle, Bluetooth, BluetoothSearching, Check, CheckCircle2, Clock3, Cpu, LoaderCircle, MapPin, Pencil, Plus, RefreshCw, Server, Snowflake, ThermometerSnowflake, Trash2, Truck, Unplug, Wifi } from 'lucide-react'
+import { AlertTriangle, Bluetooth, BluetoothSearching, Check, CheckCircle2, Clock3, Cpu, LoaderCircle, MapPin, Pencil, Plus, RefreshCw, Server, Snowflake, ThermometerSnowflake, Trash2, Truck, Unplug, Wifi, WifiOff } from 'lucide-react'
 
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Appear } from '@/components/appear.jsx'
@@ -27,6 +27,7 @@ import {
   saveResource,
   sensorProvisioningFormSchema,
   simulateSensorExcursion,
+  simulateSensorOffline,
   simulateSensorRecovery,
   unassignSensor,
   vehicleInputSchema,
@@ -119,10 +120,11 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
     event.preventDefault()
     const formElement = event.currentTarget
     const form = new FormData(formElement)
+    const capacityKg = numericValue(form, 'capacityKg')
     const input = isColdStorage ? {
       name: form.get('name'),
-      capacityKg: numericValue(form, 'capacityKg'),
-      availableCapacityKg: numericValue(form, 'availableCapacityKg'),
+      capacityKg,
+      availableCapacityKg: capacityKg,
       operationalStatus: form.get('operationalStatus'),
     } : isVehicle ? {
       code: form.get('code'),
@@ -162,10 +164,7 @@ function ResourceDialog({ type, resource, onClose, onComplete }) {
         {isColdStorage ? (
           <>
             <FormField label="Name" htmlFor="resource-name" error={errors.name}><Input className="h-10" id="resource-name" name="name" defaultValue={resource?.name ?? ''} placeholder="Cold Room 1" autoFocus required aria-invalid={Boolean(errors.name)} /></FormField>
-            <div className="grid gap-3 sm:grid-cols-2">
-              <FormField label="Total capacity (kg)" htmlFor="capacity-kg" error={errors.capacityKg}><Input className="h-10" id="capacity-kg" name="capacityKg" type="number" min="0.01" step="0.01" defaultValue={resource?.capacityKg ?? ''} required aria-invalid={Boolean(errors.capacityKg)} /></FormField>
-              <FormField label="Available capacity (kg)" htmlFor="available-capacity-kg" error={errors.availableCapacityKg}><Input className="h-10" id="available-capacity-kg" name="availableCapacityKg" type="number" min="0" step="0.01" defaultValue={resource?.availableCapacityKg ?? ''} required aria-invalid={Boolean(errors.availableCapacityKg)} /></FormField>
-            </div>
+            <FormField label="Total capacity (kg)" htmlFor="capacity-kg" error={errors.capacityKg} help="Available capacity is derived from batches physically stored here."><Input className="h-10" id="capacity-kg" name="capacityKg" type="number" min="0.01" step="0.01" defaultValue={resource?.capacityKg ?? ''} required aria-invalid={Boolean(errors.capacityKg)} /></FormField>
             <FormField label="Operational status" htmlFor="storage-status" error={errors.operationalStatus} help={resource?.status === 'FULL' ? 'Status cannot be changed while storage is full.' : undefined}><ResourceSelect id="storage-status" name={resource?.status === 'FULL' ? undefined : 'operationalStatus'} defaultValue={resource?.operationalStatus ?? 'AVAILABLE'} disabled={resource?.status === 'FULL'} options={resourceOperationalStatuses} ariaInvalid={Boolean(errors.operationalStatus)} />{resource?.status === 'FULL' && <input name="operationalStatus" type="hidden" value={resource.operationalStatus} />}</FormField>
           </>
         ) : isVehicle ? (
@@ -495,6 +494,18 @@ function DeleteDialog({ resource, type, onClose, onComplete }) {
   )
 }
 
+const sensorSimulationActions = {
+  excursion: simulateSensorExcursion,
+  recovery: simulateSensorRecovery,
+  offline: simulateSensorOffline,
+}
+
+const sensorSimulationMessages = {
+  excursion: 'Excursion simulated',
+  recovery: 'Recovery simulated',
+  offline: 'Offline state simulated',
+}
+
 function SensorCard({ resource, onDelete, onAssignment, onComplete }) {
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
@@ -506,13 +517,14 @@ function SensorCard({ resource, onDelete, onAssignment, onComplete }) {
   })
   const latest = readings.data?.at(-1)
   const simulation = useMutation({
-    mutationFn: (action) => action === 'excursion' ? simulateSensorExcursion(resource.id) : simulateSensorRecovery(resource.id),
+    mutationFn: (action) => sensorSimulationActions[action](resource.id),
     onSuccess: async (_, action) => {
       await Promise.all(['overview', 'resources', 'batches', 'plans'].map((queryKey) => queryClient.invalidateQueries({ queryKey: [queryKey] })))
-      onComplete(action === 'excursion' ? `Excursion simulated for ${resource.code}` : `Recovery simulated for ${resource.code}`)
+      onComplete(`${sensorSimulationMessages[action]} for ${resource.code}`)
     },
   })
   const simulated = resource.code.startsWith('SIM-S-')
+  const simulationEligible = Boolean(resource.assignment) && resource.provisioningStatus === 'PROVISIONED'
 
   async function refresh() {
     setRefreshing(true)
@@ -538,8 +550,9 @@ function SensorCard({ resource, onDelete, onAssignment, onComplete }) {
       {simulation.isError && <p className="text-xs text-red-700" role="alert">{apiError(simulation.error)}</p>}
       <div className="mt-auto -mx-5 -mb-5 grid grid-cols-2 gap-2 border-t border-border p-3 px-5">
         <Button className="col-span-2 w-full" variant="secondary" size="sm" type="button" onClick={onAssignment} disabled={resource.provisioningStatus !== 'PROVISIONED'}><Unplug />{resource.assignment ? 'End assignment' : 'Assign sensor'}</Button>
-        {simulated && <><Button className="min-w-0" variant="outline" size="sm" type="button" onClick={() => simulation.mutate('excursion')} disabled={!resource.assignment || resource.provisioningStatus !== 'PROVISIONED' || simulation.isPending}><AlertTriangle />{simulation.isPending && simulation.variables === 'excursion' ? 'Simulating…' : 'Excursion'}</Button>
-        <Button className="min-w-0" variant="outline" size="sm" type="button" onClick={() => simulation.mutate('recovery')} disabled={!resource.assignment || resource.provisioningStatus !== 'PROVISIONED' || simulation.isPending}><ThermometerSnowflake />{simulation.isPending && simulation.variables === 'recovery' ? 'Recovering…' : 'Recovery'}</Button></>}
+        {simulated && <><Button className="min-w-0" variant="outline" size="sm" type="button" onClick={() => simulation.mutate('excursion')} disabled={!simulationEligible || simulation.isPending}><AlertTriangle />{simulation.isPending && simulation.variables === 'excursion' ? 'Simulating…' : 'Excursion'}</Button>
+        <Button className="min-w-0" variant="outline" size="sm" type="button" onClick={() => simulation.mutate('recovery')} disabled={!simulationEligible || simulation.isPending}><ThermometerSnowflake />{simulation.isPending && simulation.variables === 'recovery' ? 'Recovering…' : 'Recovery'}</Button>
+        {simulationEligible && resource.connectivityStatus !== 'OFFLINE' && <Button className="col-span-2 w-full" variant="outline" size="sm" type="button" onClick={() => simulation.mutate('offline')} disabled={simulation.isPending}><WifiOff />{simulation.isPending && simulation.variables === 'offline' ? 'Taking offline…' : 'Offline'}</Button>}</>}
         <Button className={cn('min-w-0', !simulated && 'col-span-2')} variant="destructive-outline" size="sm" type="button" onClick={onDelete}><Trash2 />Delete</Button>
       </div>
     </article>

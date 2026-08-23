@@ -1,25 +1,26 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, CheckCircle2, CircleX, Plus, Route, Ship } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, CheckCircle2, CircleHelp, CircleX, Plus, Route, Ship } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { Appear } from '@/components/appear.jsx'
 import { PageHeader } from '@/components/page-header.jsx'
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.jsx'
 import { Textarea } from '@/components/ui/textarea.jsx'
 import { listBatches } from '@/features/batches/batches-api.js'
 import { resolvePlanLineage } from '@/features/plans/plan-lineage.js'
+import { formatDuration } from '@/features/plans/plan-timing.js'
 import { approvePlan, completePlanStep, createPlanProposal, createPlanRevision, dismissPlan, planQueryOptions, plansQueryOptions } from '@/features/plans/plans-api.js'
 import { listResources } from '@/features/resources/resources-api.js'
 import { sortPlanSteps } from '@/lib/ordering.js'
 import { cn } from '@/lib/utils.js'
 
-const actions = { STORE: 'Store', LOAD: 'Load', DISPATCH: 'Dispatch', HANDOVER: 'Hand over', INSPECT: 'Inspect', OTHER: 'Handle' }
+const actions = { STORE: 'Store', LOAD: 'Load', DISPATCH: 'Dispatch', RETURN_TO_BASE: 'Return to base', HANDOVER: 'Hand over', INSPECT: 'Inspect', OTHER: 'Handle' }
 const prepositions = { STORE: 'in', LOAD: 'into', DISPATCH: 'to', HANDOVER: 'at', INSPECT: 'at', OTHER: 'with' }
 const eligibleStatuses = new Set(['MONITORING', 'ACTIVE', 'INSPECTION_HOLD'])
 const dateFormatter = new Intl.DateTimeFormat([], { dateStyle: 'medium', timeStyle: 'short' })
@@ -29,9 +30,11 @@ function localDateTime(value) { const date = new Date(value); date.setMinutes(da
 function describeStep(step) {
   const vehicle = step.resources.find((resource) => resource.type === 'VEHICLE')
   const destination = step.resources.find((resource) => resource.type === 'DESTINATION')
-  if (step.actionType === 'DISPATCH') return `Dispatch ${step.batch.code}${vehicle ? ` via ${vehicle.name}` : ''}${destination ? ` to ${destination.name}` : ''}`
+  if (step.actionType === 'RETURN_TO_BASE') return `Return ${vehicle?.name ?? 'vehicle'} to base${destination ? ` from ${destination.name}` : ''}`
+  if (step.actionType === 'HANDOVER') return `Hand over ${step.batch?.code ?? 'batch'}${destination ? ` at ${destination.name}` : ''}`
+  if (step.actionType === 'DISPATCH') return `Dispatch ${step.batch?.code ?? 'batch'}${vehicle ? ` via ${vehicle.name}` : ''}${destination ? ` to ${destination.name}` : ''}`
   const resource = step.resources[0]
-  return `${actions[step.actionType]} ${step.batch.code}${resource ? ` ${prepositions[step.actionType]} ${resource.name}` : ''}`
+  return `${actions[step.actionType]} ${step.batch?.code ?? 'batch'}${resource ? ` ${prepositions[step.actionType]} ${resource.name}` : ''}`
 }
 function formatSource(source) { return source === 'WHATSAPP' ? 'WhatsApp' : source[0] + source.slice(1).toLowerCase() }
 function invalidatePlanQueries(queryClient) { return Promise.all(['plans', 'overview', 'batches'].map((queryKey) => queryClient.invalidateQueries({ queryKey: [queryKey] }))) }
@@ -51,6 +54,21 @@ function QueryState({ query, label = 'plans' }) {
   return null
 }
 
+function DelayWarning({ timing, full = false }) {
+  if (timing.status !== 'DELAYED') return null
+  const critical = timing.reasons.some((reason) => reason.severity === 'CRITICAL')
+  const duration = formatDuration(timing.delayedBySeconds)
+  const colors = critical ? 'border-red-200 bg-red-50 text-red-950' : 'border-amber-200 bg-amber-50 text-amber-950'
+  const iconColor = critical ? 'text-red-600' : 'text-amber-600'
+
+  if (!full) return <div className={cn('mt-4 flex items-start gap-2 rounded-lg border px-3 py-2 text-xs font-semibold', colors)} role="status"><AlertTriangle className={cn('mt-0.5 shrink-0', iconColor)} size={15} aria-hidden="true" /><span>{critical ? 'Critical delay' : 'Delayed'} by {duration}</span></div>
+
+  return <section className={cn('rounded-xl border p-5', colors)} aria-label={`${critical ? 'Critical' : 'Plan'} delay warning`} role="alert">
+    <div className="flex items-start gap-3"><AlertTriangle className={cn('mt-0.5 shrink-0', iconColor)} size={20} aria-hidden="true" /><div className="min-w-0"><h2 className="text-sm font-bold">{critical ? 'Critical plan delay' : 'Plan delayed'} by {duration}</h2><p className="mt-1 text-xs leading-relaxed">Review every timing constraint before continuing with this plan.</p></div></div>
+    <ul className="mt-4 grid gap-2" aria-label="Deterministic delay reasons">{timing.reasons.map((reason, index) => <li className="rounded-lg bg-white/60 px-3 py-2 text-sm leading-relaxed" key={`${reason.code}-${index}`}><span className="font-bold">{reason.severity === 'CRITICAL' ? 'Critical: ' : 'Warning: '}</span>{reason.message} <span className="whitespace-nowrap font-semibold">Delay: {formatDuration(reason.delaySeconds)}.</span></li>)}</ul>
+  </section>
+}
+
 function PlanCard({ plan, plans }) {
   const steps = sortPlanSteps(plan.steps)
   const lineage = resolvePlanLineage(plan, plans)
@@ -59,6 +77,7 @@ function PlanCard({ plan, plans }) {
   return <Appear as="article" className={cn('rounded-xl border bg-card p-5', plan.status === 'PROPOSED' && 'border-sky-200 bg-sky-50/30')}>
     <div className="flex items-start justify-between gap-3"><div><div className="flex flex-wrap items-center gap-2"><h3 className="font-bold">Plan V{plan.version}</h3>{statusBadge(plan.status)}</div><p className="mt-2 line-clamp-2 text-sm font-semibold leading-relaxed">{plan.summary}</p><p className="mt-1 text-xs text-muted-foreground">{plan.batches.map((batch) => batch.code).join(', ')}</p><p className="mt-1 text-xs text-muted-foreground">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p></div><Route className="shrink-0 text-primary" size={20} /></div>
     {plan.status === 'PROPOSED' && plan.trigger && <div className="mt-4 rounded-lg border border-sky-100 bg-white/70 px-3 py-2"><span className="text-[11px] font-bold uppercase tracking-wide text-sky-800">Trigger · {formatSource(plan.trigger.source)}</span><p className="mt-1 line-clamp-2 text-xs text-slate-700">{plan.trigger.message}</p></div>}
+    <DelayWarning timing={plan.timing} />
     {lineage && <p className="mt-4 border-l-2 border-primary/30 pl-3 text-xs text-muted-foreground">Revision of <strong className="text-foreground">Plan V{lineage.predecessor.version}</strong> · {lineage.retainedCompletedSteps} completed {lineage.retainedCompletedSteps === 1 ? 'step' : 'steps'} retained</p>}
     <div className="mt-5"><div className="mb-2 flex justify-between text-xs"><span className="text-muted-foreground">{next ? `Next · ${formatDateTime(next.scheduledAt)}` : 'No future steps'}</span><strong>{completed}/{steps.length}</strong></div><div className="flex gap-1" aria-label={`${completed} of ${steps.length} steps completed`}>{steps.map((step) => <span className={cn('h-1.5 flex-1 rounded-full', step.status === 'COMPLETED' ? 'bg-primary' : 'bg-slate-200')} key={step.id} />)}</div></div>
     <Button className="mt-5 w-full" variant="outline" asChild><Link to={`/plans/${plan.id}`}>{plan.status === 'PROPOSED' ? 'Review proposal' : 'View plan'}</Link></Button>
@@ -69,7 +88,7 @@ function CreatePlanDialog({ activePlans, onClose }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const [selected, setSelected] = useState([])
-  const [destinationId, setDestinationId] = useState('')
+  const [destinationIds, setDestinationIds] = useState([])
   const [deadline, setDeadline] = useState('')
   const [openedAt] = useState(() => Date.now())
   const batches = useQuery({ queryKey: ['batches'], queryFn: listBatches })
@@ -80,19 +99,20 @@ function CreatePlanDialog({ activePlans, onClose }) {
   const validDeadline = deadline && new Date(deadline).getTime() > openedAt
   const mutation = useMutation({ mutationFn: createPlanProposal, onSuccess: async (result) => { if (result.status === 'NO_VALID_PROPOSAL_FOUND') return; await invalidatePlanQueries(queryClient); onClose(); navigate(`/plans/${result.proposal.id}`) } })
   function toggle(id) { setSelected((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
+  function toggleDestination(id) { setDestinationIds((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]) }
   return <Dialog open onOpenChange={(open) => !open && onClose()}><DialogContent className="max-w-[560px] p-6"><DialogHeader><DialogTitle>Create plan proposal</DialogTitle><DialogDescription>Select the active batches and their delivery destination.</DialogDescription></DialogHeader>
     {destinations.isPending && <p className="text-sm text-muted-foreground" role="status">Loading destinations…</p>}
     {destinations.isError && <ErrorMessage error={destinations.error} />}
-    {destinations.isSuccess && availableDestinations.length > 0 && <div className="grid gap-2"><Label htmlFor="plan-destination">Destination</Label><Select value={destinationId} onValueChange={setDestinationId}><SelectTrigger id="plan-destination" className="w-full"><SelectValue placeholder="Select a destination" /></SelectTrigger><SelectContent>{availableDestinations.map((destination) => <SelectItem key={destination.id} value={destination.id}>{destination.name} · {destination.address}</SelectItem>)}</SelectContent></Select></div>}
+    {destinations.isSuccess && availableDestinations.length > 0 && <fieldset className="grid gap-2"><legend className="text-sm font-semibold">Available destinations</legend>{availableDestinations.map((destination) => <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3" key={destination.id}><input className="mt-1 size-4 accent-primary" type="checkbox" checked={destinationIds.includes(destination.id)} onChange={() => toggleDestination(destination.id)} /><span><strong className="block text-sm">{destination.name}</strong><span className="block text-xs text-muted-foreground">{destination.address} · {destination.travelMinutes} min · receives {destination.receivingStart}–{destination.receivingEnd}</span></span></Label>)}</fieldset>}
     <div className="grid gap-2"><Label htmlFor="plan-deadline">Arrival deadline</Label><Input id="plan-deadline" type="datetime-local" min={localDateTime(openedAt)} value={deadline} onChange={(event) => setDeadline(event.target.value)} required /><p className="text-xs text-muted-foreground">All selected batches must arrive at the destination by this time.</p></div>
     {destinations.isSuccess && !availableDestinations.length && <p className="rounded-lg border border-dashed p-4 text-sm text-muted-foreground">No available destinations are configured.</p>}
     {batches.isPending && <p className="py-8 text-center text-sm text-muted-foreground" role="status">Loading eligible batches…</p>}
     {batches.isError && <ErrorMessage error={batches.error} />}
     {batches.isSuccess && !eligible.length && <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No eligible active batches are available.</p>}
-    {eligible.length > 0 && <fieldset className="grid max-h-80 gap-2 overflow-y-auto"><legend className="sr-only">Eligible batches</legend>{eligible.map((batch) => <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-slate-50" key={batch.id}><input className="mt-1 size-4 accent-primary" type="checkbox" checked={selected.includes(batch.id)} onChange={() => toggle(batch.id)} /><span><strong className="block text-sm">{batch.code}</strong><span className="text-xs text-muted-foreground">{batch.weightKg.toLocaleString()} kg · Grade {batch.grade} · {batch.status.replaceAll('_', ' ').toLowerCase()}</span></span></Label>)}</fieldset>}
+    {eligible.length > 0 && <fieldset className="grid max-h-80 gap-2 overflow-y-auto"><legend className="sr-only">Eligible batches</legend>{eligible.map((batch) => <Label className="flex cursor-pointer items-start gap-3 rounded-lg border border-border p-3 hover:bg-slate-50" key={batch.id}><input className="mt-1 size-4 accent-primary" type="checkbox" checked={selected.includes(batch.id)} onChange={() => toggle(batch.id)} /><span><strong className="block text-sm">{batch.code}</strong><span className="text-xs text-muted-foreground">{batch.weightKg.toLocaleString()} kg · Grade {batch.grade} · {batch.location.name}</span></span></Label>)}</fieldset>}
     {mutation.isError && <ErrorMessage error={mutation.error} />}
     {mutation.data?.status === 'NO_VALID_PROPOSAL_FOUND' && <p className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800" role="status"><strong className="block">No valid proposal found</strong>{mutation.data.reason}</p>}
-    <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!selected.length || !destinationId || !validDeadline || mutation.isPending} onClick={() => mutation.mutate({ batchIds: selected, destinationId, deadline: new Date(deadline).toISOString() })}>{mutation.isPending ? 'Creating…' : `Create proposal${selected.length ? ` (${selected.length})` : ''}`}</Button></DialogFooter>
+    <DialogFooter><Button variant="outline" onClick={onClose}>Cancel</Button><Button disabled={!selected.length || !destinationIds.length || !validDeadline || mutation.isPending} onClick={() => mutation.mutate({ batchIds: selected, destinationIds, deadline: new Date(deadline).toISOString() })}>{mutation.isPending ? 'Creating…' : `Create proposal${selected.length ? ` (${selected.length})` : ''}`}</Button></DialogFooter>
   </DialogContent></Dialog>
 }
 
@@ -119,12 +139,21 @@ function PlanSection({ title, description, count, plans, allPlans, empty }) {
   return <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-sm font-bold">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{description}</p></div><span className="text-xs text-muted-foreground">{count}</span></div>{plans.length ? <div className="grid grid-cols-3 gap-3.5 max-[1020px]:grid-cols-2 max-[640px]:grid-cols-1">{plans.map((plan) => <PlanCard key={plan.id} plan={plan} plans={allPlans} />)}</div> : <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground"><Ship className="mr-2" size={17} />{empty}</div>}</section>
 }
 
+function ReasonContent({ step }) {
+  return <div className="grid gap-4"><div><p className="text-xs font-bold text-foreground">Why this action</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.rationale ?? 'No action explanation was stored for this historical step.'}</p></div><div><p className="text-xs font-bold text-foreground">Why this timing</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.timingRationale ?? 'No timing explanation was stored for this historical step.'}</p></div>{step.latestSafeAt && <div className="rounded-lg bg-muted px-3 py-2"><p className="text-xs font-bold text-foreground">Latest safe time</p><p className="mt-1 text-sm text-muted-foreground">{formatDateTime(step.latestSafeAt)}</p></div>}</div>
+}
+
+function StepReason({ step }) {
+  return <><span className="max-[640px]:hidden"><Popover><PopoverTrigger asChild><Button size="sm" variant="outline"><CircleHelp />Why?</Button></PopoverTrigger><PopoverContent aria-label={`Reason for step ${step.sequence}`}><ReasonContent step={step} /></PopoverContent></Popover></span><span className="hidden max-[640px]:inline-flex"><Dialog><DialogTrigger asChild><Button size="sm" variant="outline"><CircleHelp />Why?</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Why this step?</DialogTitle><DialogDescription>{describeStep(step)}</DialogDescription></DialogHeader><ReasonContent step={step} /></DialogContent></Dialog></span></>
+}
+
 function PlanSteps({ plan, completion }) {
   const steps = sortPlanSteps(plan.steps)
   if (!steps.length) return <p className="p-5 text-center text-sm text-muted-foreground">No steps stored for this plan.</p>
   return <ol className="divide-y divide-border">{steps.map((step, index) => {
     const completed = step.status === 'COMPLETED'; const canceled = step.status === 'CANCELED'; const marking = completion?.isPending && completion.variables?.stepId === step.id
-    return <li className={cn('grid grid-cols-[40px_1fr_auto] items-center gap-3 p-5', (completed || canceled) && 'bg-slate-50 text-slate-500')} key={step.id}><span className={cn('grid size-8 place-items-center rounded-full border text-xs font-bold', completed ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white')}>{completed ? <Check size={15} /> : canceled ? <CircleX size={15} /> : index + 1}</span><div><strong className={cn('block text-sm', canceled && 'line-through')}>{describeStep(step)}</strong><span className="mt-1 block text-xs">{completed ? `Completed ${formatDateTime(step.completedAt)}` : canceled ? 'Canceled' : `Scheduled ${formatDateTime(step.scheduledAt)}`}</span>{step.rationale && <span className="mt-1 block text-xs text-muted-foreground">{step.rationale}</span>}</div>{completion && step.status === 'UPCOMING' && <Button size="sm" variant="outline" disabled={completion.isPending} onClick={() => completion.mutate({ planId: plan.id, stepId: step.id })}><CheckCircle2 />{marking ? 'Marking…' : 'Mark complete'}</Button>}</li>
+    const completionLabel = step.actionType === 'RETURN_TO_BASE' ? 'Mark truck returned' : 'Mark complete'; const hasReason = step.rationale || step.timingRationale || step.latestSafeAt
+    return <li className={cn('grid grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 p-5 max-[640px]:grid-cols-[40px_minmax(0,1fr)]', (completed || canceled) && 'bg-slate-50 text-slate-500')} key={step.id}><span className={cn('grid size-8 place-items-center rounded-full border text-xs font-bold', completed ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white')}>{completed ? <Check size={15} /> : canceled ? <CircleX size={15} /> : index + 1}</span><div><strong className={cn('block text-sm', canceled && 'line-through')}>{describeStep(step)}</strong><span className="mt-1 block text-xs">{completed ? `Completed ${formatDateTime(step.completedAt)}` : canceled ? 'Canceled' : `${step.actionType === 'RETURN_TO_BASE' ? 'Expected' : 'Scheduled'} ${formatDateTime(step.scheduledAt)}`}</span>{step.latestSafeAt && <span className="mt-1 block text-xs font-medium text-amber-800">Worst case · Complete by {formatDateTime(step.latestSafeAt)}</span>}</div><div className="flex flex-wrap justify-end gap-2 max-[640px]:col-start-2 max-[640px]:justify-start">{hasReason && <StepReason step={step} />}{completion && step.status === 'UPCOMING' && <Button size="sm" variant="outline" disabled={completion.isPending} onClick={() => completion.mutate({ planId: plan.id, stepId: step.id })}><CheckCircle2 />{marking ? 'Marking…' : completionLabel}</Button>}</div></li>
   })}</ol>
 }
 
@@ -148,7 +177,8 @@ export function PlanDetailsPage() {
   const completion = useMutation({ mutationFn: ({ planId: id, stepId }) => completePlanStep(id, stepId), onSuccess: async () => { await Promise.all([invalidatePlanQueries(queryClient), queryClient.invalidateQueries({ queryKey: ['resources'] })]) } })
   const completed = plan?.steps.filter((step) => step.status === 'COMPLETED') ?? []; const future = plan?.steps.filter((step) => step.status !== 'COMPLETED') ?? []; const lineage = plan ? resolvePlanLineage(plan, plansQuery.data) : null
   return <div className="mx-auto w-full max-w-[980px] px-8 pt-10 pb-8 max-[780px]:px-4 max-[780px]:py-6"><Button className="mb-5" variant="ghost" onClick={() => navigate('/plans')}><ArrowLeft />All plans</Button><QueryState query={planQuery} label="plan" />
-    {plan && <div className="grid gap-5"><header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">Plan V{plan.version}</h1>{statusBadge(plan.status)}</div><p className="mt-2 max-w-2xl font-semibold leading-relaxed">{plan.summary}</p><p className="mt-2 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}</p><p className="mt-1 text-xs font-semibold text-slate-700">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p></div><div className="text-right"><strong className="text-2xl">{completed.length}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div></div><div className="mt-5 flex flex-wrap gap-2" aria-label="Scoped batches">{plan.batches.map((batch) => <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold" key={batch.id}>{batch.code}</span>)}</div></header>
+    {plan && <div className="grid gap-5"><header className="rounded-xl border border-border bg-card p-6"><div className="flex flex-wrap items-start justify-between gap-4"><div><div className="flex flex-wrap items-center gap-2"><h1 className="text-2xl font-bold tracking-[-.035em]">Plan V{plan.version}</h1>{statusBadge(plan.status)}</div><p className="mt-2 max-w-2xl font-semibold leading-relaxed">{plan.summary}</p><p className="mt-2 text-xs text-muted-foreground">Created {formatDateTime(plan.createdAt)}</p><p className="mt-1 text-xs font-semibold text-slate-700">{plan.deadline ? `Arrival deadline · ${formatDateTime(plan.deadline)}` : 'No arrival deadline'}</p><p className="mt-1 text-xs text-muted-foreground">Destination pool · {plan.destinationIds.length || (plan.destinationId ? 1 : 0)} selected</p></div><div className="text-right"><strong className="text-2xl">{completed.length}/{plan.steps.length}</strong><p className="text-xs text-muted-foreground">steps complete</p></div></div><div className="mt-5 flex flex-wrap gap-2" aria-label="Scoped batches">{plan.batches.map((batch) => <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold" key={batch.id}>{batch.code}</span>)}</div></header>
+      <DelayWarning timing={plan.timing} full />
       {plan.status === 'PROPOSED' && plan.trigger && <section className="rounded-xl border border-sky-200 bg-sky-50/50 p-5"><p className="text-xs font-bold uppercase tracking-wide text-sky-800">Proposal trigger</p><p className="mt-2 text-sm font-semibold text-sky-950">{plan.trigger.message}</p><p className="mt-2 text-xs text-sky-900">{formatSource(plan.trigger.source)} · {plan.trigger.type.replaceAll('_', ' ').toLowerCase()} · {formatDateTime(plan.trigger.occurredAt)}</p></section>}
       {lineage && <section className="rounded-xl border border-border bg-card p-5"><p className="text-xs font-bold uppercase tracking-wide text-muted-foreground">Plan lineage</p><div className="mt-2 flex flex-wrap items-baseline justify-between gap-2"><Link className="font-bold text-primary underline-offset-4 hover:underline" to={`/plans/${lineage.predecessor.id}`}>Previous plan · V{lineage.predecessor.version}</Link><span className="text-xs text-muted-foreground">{lineage.predecessor.approvedAt ? `Approved ${formatDateTime(lineage.predecessor.approvedAt)}` : 'Not approved'}</span></div><p className="mt-2 text-sm">{lineage.retainedCompletedSteps} completed {lineage.retainedCompletedSteps === 1 ? 'step was' : 'steps were'} retained in this version.</p>{lineage.predecessor.trigger && <div className="mt-3 rounded-lg bg-muted/60 px-3 py-2"><span className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">Previous trigger · {formatSource(lineage.predecessor.trigger.source)}</span><p className="mt-1 text-xs text-foreground">{lineage.predecessor.trigger.message}</p><p className="mt-1 text-[11px] text-muted-foreground">{formatDateTime(lineage.predecessor.trigger.occurredAt)}</p></div>}</section>}
       {plan.status === 'PROPOSED' && <ReviewActions plan={plan} />}

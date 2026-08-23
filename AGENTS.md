@@ -57,7 +57,7 @@ Features may import app-independent shared code. Shared code must not import fea
 
 Define API calls and query options in the owning feature. Use TanStack Query for remote state and local React state for transient UI state. Validate data at the API boundary with Zod when the backend response is not already trusted by construction.
 
-Planning generation is a strict `PROPOSAL | NO_VALID_PROPOSAL_FOUND` union. Render unsuccessful runs without assuming a proposal exists, show step rationale as explanation rather than authority, and display both vehicle and destination for dispatch actions.
+Planning generation is a strict `PROPOSAL | NO_VALID_PROPOSAL_FOUND` union. Every plan includes strict `timing` metadata with `ON_TIME | DELAYED` status, an exact nonnegative delay in seconds, and deterministic warning or critical reasons. Render unsuccessful runs without assuming a proposal exists, show step rationale as explanation rather than authority, and display both vehicle and destination for dispatch actions.
 
 Use routes to compose feature pages rather than placing product behavior in `App.jsx`. Build responsive, accessible interfaces that follow the UI guide, never communicate status by color alone, and keep proposed AI actions visually distinct from active plans.
 

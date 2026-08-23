@@ -8,5 +8,5 @@ export function resolvePlanLineage(plan, plans) {
 }
 
 function stepFact(step) {
-  return [step.sequence, step.actionType, step.batch.id, step.completedAt].join(':')
+  return [step.sequence, step.actionType, step.batch?.id ?? '', step.completedAt].join(':')
 }

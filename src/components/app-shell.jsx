@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import {
   Blocks,
   Boxes,
+  CalendarDays,
   LayoutDashboard,
   LogOut,
   Menu,
@@ -23,6 +24,7 @@ const navigation = [
     items: [
       { label: 'Overview', icon: LayoutDashboard, path: '/' },
       { label: 'Plans', icon: Route, path: '/plans' },
+      { label: 'Schedule', icon: CalendarDays, path: '/schedule' },
     ],
   },
   {
@@ -85,7 +87,7 @@ export function AppShell({ user, onLogout, logoutPending }) {
   const menuButtonRef = useRef(null)
   const sidebarWasOpen = useRef(false)
   const location = useLocation()
-  const title = location.pathname === '/resources' ? 'Resources' : location.pathname === '/fishing-trips' ? 'Fishing Trips' : location.pathname === '/batches' ? 'Batches' : location.pathname.startsWith('/plans') ? 'Plans' : 'SIRIP'
+  const title = location.pathname === '/resources' ? 'Resources' : location.pathname === '/fishing-trips' ? 'Fishing Trips' : location.pathname === '/batches' ? 'Batches' : location.pathname === '/schedule' ? 'Schedule' : location.pathname.startsWith('/plans') ? 'Plans' : 'SIRIP'
   const whatsappUrl = getWhatsAppUrl(`Hello SIRIP, I need help with ${title.toLowerCase()}.`)
 
   useEffect(() => {
