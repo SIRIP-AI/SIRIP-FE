@@ -6,6 +6,7 @@ import { FishingTripsPage } from '@/features/batches/fishing-trips-page.jsx'
 import { OverviewPage } from '@/features/overview/overview-page.jsx'
 import { PlanDetailsPage, PlansPage } from '@/features/plans/plans-page.jsx'
 import { ResourcesPage } from '@/features/resources/resources-page.jsx'
+import { SchedulePage } from '@/features/schedule/schedule-page.jsx'
 
 export function AppRouter() {
   return (
@@ -19,6 +20,7 @@ export function AppRouter() {
         <Route path="fishing-trips" element={<FishingTripsPage />} />
         <Route path="plans" element={<PlansPage />} />
         <Route path="plans/:planId" element={<PlanDetailsPage />} />
+        <Route path="schedule" element={<SchedulePage />} />
         <Route path="resources" element={<ResourcesPage />} />
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
