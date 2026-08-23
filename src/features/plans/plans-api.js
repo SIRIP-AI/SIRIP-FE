@@ -30,6 +30,8 @@ const stepSchema = z.strictObject({
   status: z.enum(['UPCOMING', 'COMPLETED', 'CANCELED']),
   completedAt: isoDateTimeSchema.nullable(),
   rationale: z.string().nullable(),
+  timingRationale: z.string().nullish().transform((value) => value ?? null),
+  latestSafeAt: isoDateTimeSchema.nullish().transform((value) => value ?? null),
   batch: z.strictObject({ id: z.string(), code: z.string() }).nullable(),
   resources: z.array(resourceSchema),
 })

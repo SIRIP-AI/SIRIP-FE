@@ -1,15 +1,16 @@
 import { useState } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { ArrowLeft, Check, CheckCircle2, CircleX, Plus, Route, Ship } from 'lucide-react'
+import { ArrowLeft, Check, CheckCircle2, CircleHelp, CircleX, Plus, Route, Ship } from 'lucide-react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 
 import { Appear } from '@/components/appear.jsx'
 import { PageHeader } from '@/components/page-header.jsx'
 import { StatusBadge } from '@/components/status-badge.jsx'
 import { Button } from '@/components/ui/button.jsx'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog.jsx'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog.jsx'
 import { Input } from '@/components/ui/input.jsx'
 import { Label } from '@/components/ui/label.jsx'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover.jsx'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select.jsx'
 import { Textarea } from '@/components/ui/textarea.jsx'
 import { listBatches } from '@/features/batches/batches-api.js'
@@ -120,13 +121,21 @@ function PlanSection({ title, description, count, plans, allPlans, empty }) {
   return <section><div className="mb-3 flex items-end justify-between gap-3"><div><h2 className="text-sm font-bold">{title}</h2><p className="mt-1 text-xs text-muted-foreground">{description}</p></div><span className="text-xs text-muted-foreground">{count}</span></div>{plans.length ? <div className="grid grid-cols-3 gap-3.5 max-[1020px]:grid-cols-2 max-[640px]:grid-cols-1">{plans.map((plan) => <PlanCard key={plan.id} plan={plan} plans={allPlans} />)}</div> : <div className="flex min-h-28 items-center justify-center rounded-xl border border-dashed border-slate-300 bg-white/50 text-sm text-muted-foreground"><Ship className="mr-2" size={17} />{empty}</div>}</section>
 }
 
+function ReasonContent({ step }) {
+  return <div className="grid gap-4"><div><p className="text-xs font-bold text-foreground">Why this action</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.rationale ?? 'No action explanation was stored for this historical step.'}</p></div><div><p className="text-xs font-bold text-foreground">Why this timing</p><p className="mt-1 text-sm leading-relaxed text-muted-foreground">{step.timingRationale ?? 'No timing explanation was stored for this historical step.'}</p></div>{step.latestSafeAt && <div className="rounded-lg bg-muted px-3 py-2"><p className="text-xs font-bold text-foreground">Latest safe time</p><p className="mt-1 text-sm text-muted-foreground">{formatDateTime(step.latestSafeAt)}</p></div>}</div>
+}
+
+function StepReason({ step }) {
+  return <><span className="max-[640px]:hidden"><Popover><PopoverTrigger asChild><Button size="sm" variant="outline"><CircleHelp />Why?</Button></PopoverTrigger><PopoverContent aria-label={`Reason for step ${step.sequence}`}><ReasonContent step={step} /></PopoverContent></Popover></span><span className="hidden max-[640px]:inline-flex"><Dialog><DialogTrigger asChild><Button size="sm" variant="outline"><CircleHelp />Why?</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Why this step?</DialogTitle><DialogDescription>{describeStep(step)}</DialogDescription></DialogHeader><ReasonContent step={step} /></DialogContent></Dialog></span></>
+}
+
 function PlanSteps({ plan, completion }) {
   const steps = sortPlanSteps(plan.steps)
   if (!steps.length) return <p className="p-5 text-center text-sm text-muted-foreground">No steps stored for this plan.</p>
   return <ol className="divide-y divide-border">{steps.map((step, index) => {
     const completed = step.status === 'COMPLETED'; const canceled = step.status === 'CANCELED'; const marking = completion?.isPending && completion.variables?.stepId === step.id
-    const completionLabel = step.actionType === 'RETURN_TO_BASE' ? 'Mark truck returned' : 'Mark complete'
-    return <li className={cn('grid grid-cols-[40px_1fr_auto] items-center gap-3 p-5', (completed || canceled) && 'bg-slate-50 text-slate-500')} key={step.id}><span className={cn('grid size-8 place-items-center rounded-full border text-xs font-bold', completed ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white')}>{completed ? <Check size={15} /> : canceled ? <CircleX size={15} /> : index + 1}</span><div><strong className={cn('block text-sm', canceled && 'line-through')}>{describeStep(step)}</strong><span className="mt-1 block text-xs">{completed ? `Completed ${formatDateTime(step.completedAt)}` : canceled ? 'Canceled' : `${step.actionType === 'RETURN_TO_BASE' ? 'Expected' : 'Scheduled'} ${formatDateTime(step.scheduledAt)}`}</span>{step.rationale && <span className="mt-1 block text-xs text-muted-foreground">{step.rationale}</span>}</div>{completion && step.status === 'UPCOMING' && <Button size="sm" variant="outline" disabled={completion.isPending} onClick={() => completion.mutate({ planId: plan.id, stepId: step.id })}><CheckCircle2 />{marking ? 'Marking…' : completionLabel}</Button>}</li>
+    const completionLabel = step.actionType === 'RETURN_TO_BASE' ? 'Mark truck returned' : 'Mark complete'; const hasReason = step.rationale || step.timingRationale || step.latestSafeAt
+    return <li className={cn('grid grid-cols-[40px_minmax(0,1fr)_auto] items-center gap-3 p-5 max-[640px]:grid-cols-[40px_minmax(0,1fr)]', (completed || canceled) && 'bg-slate-50 text-slate-500')} key={step.id}><span className={cn('grid size-8 place-items-center rounded-full border text-xs font-bold', completed ? 'border-primary bg-primary text-white' : 'border-slate-300 bg-white')}>{completed ? <Check size={15} /> : canceled ? <CircleX size={15} /> : index + 1}</span><div><strong className={cn('block text-sm', canceled && 'line-through')}>{describeStep(step)}</strong><span className="mt-1 block text-xs">{completed ? `Completed ${formatDateTime(step.completedAt)}` : canceled ? 'Canceled' : `${step.actionType === 'RETURN_TO_BASE' ? 'Expected' : 'Scheduled'} ${formatDateTime(step.scheduledAt)}`}</span>{step.latestSafeAt && <span className="mt-1 block text-xs font-medium text-amber-800">Worst case · Complete by {formatDateTime(step.latestSafeAt)}</span>}</div><div className="flex flex-wrap justify-end gap-2 max-[640px]:col-start-2 max-[640px]:justify-start">{hasReason && <StepReason step={step} />}{completion && step.status === 'UPCOMING' && <Button size="sm" variant="outline" disabled={completion.isPending} onClick={() => completion.mutate({ planId: plan.id, stepId: step.id })}><CheckCircle2 />{marking ? 'Marking…' : completionLabel}</Button>}</div></li>
   })}</ol>
 }
 
