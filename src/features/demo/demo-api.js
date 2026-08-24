@@ -10,5 +10,6 @@ export async function resetDemoData() {
 }
 
 export function demoError(error) {
-  return error.response?.data?.error ?? error.message ?? 'The demo action could not be completed'
+  if (error?.response?.data?.error) return error.response.data.error
+  return error?.request && !error.response ? 'Tidak dapat terhubung ke server. Periksa koneksi Anda.' : 'Tindakan demo tidak dapat diselesaikan. Silakan coba lagi.'
 }

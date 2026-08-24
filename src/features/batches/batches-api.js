@@ -3,16 +3,16 @@ import { z } from 'zod'
 import { api } from '@/lib/axios.js'
 
 export const fishingTripInputSchema = z.object({
-  code: z.string().trim().min(1, 'Trip ID is required').max(100),
-  vesselName: z.string().trim().min(1, 'Vessel is required').max(100),
+  code: z.string().trim().min(1, 'ID perjalanan wajib diisi').max(100, 'ID perjalanan maksimal 100 karakter'),
+  vesselName: z.string().trim().min(1, 'Nama kapal wajib diisi').max(100, 'Nama kapal maksimal 100 karakter'),
 })
 
 export const batchInputSchema = z.object({
-  code: z.string().trim().min(1, 'Batch ID is required').max(100),
-  fishingTripId: z.string().regex(/^\d+$/, 'Fishing trip is required'),
-  weightKg: z.number().positive('Weight must be greater than zero'),
-  grade: z.string().trim().min(1, 'Grade is required').max(100),
-  receivedAt: z.string().datetime(),
+  code: z.string().trim().min(1, 'ID batch wajib diisi').max(100, 'ID batch maksimal 100 karakter'),
+  fishingTripId: z.string().regex(/^\d+$/, 'Perjalanan melaut wajib diisi'),
+  weightKg: z.number().positive('Berat harus lebih dari nol'),
+  grade: z.string().trim().min(1, 'Mutu wajib diisi').max(100, 'Mutu maksimal 100 karakter'),
+  receivedAt: z.string().datetime({ error: 'Tanggal diterima tidak valid' }),
 })
 
 const fishingTripSchema = fishingTripInputSchema.extend({
@@ -92,5 +92,6 @@ export async function simulateBatchQualityRisk(id) {
 }
 
 export function apiError(error) {
-  return error.response?.data?.error ?? error.message ?? 'Something went wrong'
+  if (error?.response?.data?.error) return error.response.data.error
+  return error?.request && !error.response ? 'Tidak dapat terhubung ke server. Periksa koneksi Anda.' : 'Data perjalanan atau batch tidak dapat diproses. Silakan coba lagi.'
 }

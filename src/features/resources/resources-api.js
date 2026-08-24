@@ -10,40 +10,40 @@ export const destinationStatuses = ['AVAILABLE', 'UNAVAILABLE']
 export const sensorProvisioningStatuses = ['PENDING', 'PROVISIONED']
 
 export const coldStorageInputSchema = z.object({
-  name: z.string().trim().min(1, 'Name is required').max(100),
-  capacityKg: z.number().positive('Capacity must be greater than zero'),
-  availableCapacityKg: z.number().nonnegative('Available capacity cannot be negative'),
+  name: z.string().trim().min(1, 'Nama wajib diisi').max(100, 'Nama maksimal 100 karakter'),
+  capacityKg: z.number().positive('Kapasitas harus lebih dari nol'),
+  availableCapacityKg: z.number().nonnegative('Kapasitas tersedia tidak boleh negatif'),
   operationalStatus: z.enum(resourceOperationalStatuses),
 }).refine((value) => value.availableCapacityKg <= value.capacityKg, {
-  message: 'Available capacity cannot exceed total capacity',
+  message: 'Kapasitas tersedia tidak boleh melebihi kapasitas total',
   path: ['availableCapacityKg'],
 })
 
 export const vehicleInputSchema = z.object({
-  code: z.string().trim().min(1, 'Truck ID is required').max(100),
-  capacityKg: z.number().positive('Capacity must be greater than zero'),
+  code: z.string().trim().min(1, 'ID truk wajib diisi').max(100, 'ID truk maksimal 100 karakter'),
+  capacityKg: z.number().positive('Kapasitas harus lebih dari nol'),
   operationalStatus: z.enum(resourceOperationalStatuses),
-  restriction: z.string().trim().max(500).nullish().transform((value) => value ?? null),
+  restriction: z.string().trim().max(500, 'Batasan maksimal 500 karakter').nullish().transform((value) => value ?? null),
   availabilityStart: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable(),
   availabilityEnd: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/).nullable(),
 }).refine((value) => (value.availabilityStart === null) === (value.availabilityEnd === null), {
-  message: 'Start and end time must both be provided',
+  message: 'Waktu mulai dan selesai harus diisi',
   path: ['availabilityEnd'],
 }).refine((value) => !value.availabilityStart || !value.availabilityEnd || value.availabilityEnd > value.availabilityStart, {
-  message: 'End time must be after start time',
+  message: 'Waktu selesai harus setelah waktu mulai',
   path: ['availabilityEnd'],
 })
 
 export const destinationInputSchema = z.object({
-  name: z.string().trim().min(1, 'Processor name is required').max(100),
-  address: z.string().trim().min(1, 'Location is required').max(100),
-  travelMinutes: z.number().int().nonnegative('Travel time cannot be negative'),
-  receivingStart: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, 'Start time is required'),
-  receivingEnd: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, 'End time is required'),
+  name: z.string().trim().min(1, 'Nama pengolah wajib diisi').max(100, 'Nama pengolah maksimal 100 karakter'),
+  address: z.string().trim().min(1, 'Lokasi wajib diisi').max(100, 'Lokasi maksimal 100 karakter'),
+  travelMinutes: z.number().int().nonnegative('Waktu tempuh tidak boleh negatif'),
+  receivingStart: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, 'Waktu mulai wajib diisi'),
+  receivingEnd: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/, 'Waktu selesai wajib diisi'),
   status: z.enum(destinationStatuses),
-  notes: z.string().trim().max(500).nullable(),
+  notes: z.string().trim().max(500, 'Catatan maksimal 500 karakter').nullable(),
 }).refine((value) => value.receivingEnd > value.receivingStart, {
-  message: 'End time must be after start time',
+  message: 'Waktu selesai harus setelah waktu mulai',
   path: ['receivingEnd'],
 })
 
@@ -66,25 +66,26 @@ const destinationSchema = destinationInputSchema.safeExtend({
 })
 
 export const sensorInputSchema = z.object({
-  code: z.string().trim().min(1, 'Sensor ID is required').max(100),
-  deviceUid: z.string().trim().min(1, 'Device UID is required').max(100),
+  code: z.string().trim().min(1, 'ID sensor wajib diisi').max(100, 'ID sensor maksimal 100 karakter'),
+  deviceUid: z.string().trim().min(1, 'UID perangkat wajib diisi').max(100, 'UID perangkat maksimal 100 karakter'),
   provisioningStatus: z.enum(sensorProvisioningStatuses),
 })
 
 const utf8Length = (value) => new TextEncoder().encode(value).byteLength
 
 export const sensorProvisioningFormSchema = z.object({
-  code: z.string().trim().min(1, 'Sensor ID is required').refine((value) => utf8Length(value) <= 100, 'Sensor ID must be at most 100 UTF-8 bytes'),
-  wifiSsid: z.string().min(1, 'Wi-Fi SSID is required').refine((value) => utf8Length(value) <= 32, 'Wi-Fi SSID must be at most 32 UTF-8 bytes'),
-  wifiPassword: z.string().refine((value) => value.length === 0 || value.length >= 8, 'Wi-Fi password must be empty or at least 8 characters').refine((value) => utf8Length(value) <= 63, 'Wi-Fi password must be at most 63 UTF-8 bytes'),
-  backendUrl: z.string().trim().min(1, 'Backend URL is required').refine((value) => utf8Length(value) <= 255, 'Backend URL must be at most 255 UTF-8 bytes'),
+  code: z.string().trim().min(1, 'ID sensor wajib diisi').refine((value) => utf8Length(value) <= 100, 'ID sensor maksimal 100 byte UTF-8'),
+  wifiSsid: z.string().min(1, 'SSID Wi-Fi wajib diisi').refine((value) => utf8Length(value) <= 32, 'SSID Wi-Fi maksimal 32 byte UTF-8'),
+  wifiPassword: z.string().refine((value) => value.length === 0 || value.length >= 8, 'Kata sandi Wi-Fi harus kosong atau minimal 8 karakter').refine((value) => utf8Length(value) <= 63, 'Kata sandi Wi-Fi maksimal 63 byte UTF-8'),
+  backendUrl: z.string().trim().min(1, 'URL backend wajib diisi').refine((value) => utf8Length(value) <= 255, 'URL backend maksimal 255 byte UTF-8'),
 })
 
 const sensorSchema = sensorInputSchema.safeExtend({
   id: z.string(),
   status: z.enum(['AVAILABLE', 'ASSIGNED', 'OFFLINE', 'ERROR']),
-  connectivityStatus: z.enum(['ONLINE', 'OFFLINE', 'ERROR', 'NEVER_CONNECTED']),
+  connectivityStatus: z.enum(['ONLINE', 'SYNCING', 'OFFLINE', 'ERROR', 'NEVER_CONNECTED']),
   lastSeenAt: z.string().datetime().nullable(),
+  pendingReadingCount: z.number().int().nonnegative(),
   createdAt: z.string().datetime(),
   assignment: z.object({ batchCode: z.string(), lastSyncedAt: z.string().datetime().nullable() }).nullable(),
 })
@@ -94,6 +95,7 @@ export const sensorOfflineResultSchema = z.strictObject({
   lastSeenAt: z.string().datetime(),
   lastSyncedAt: z.string().datetime(),
   processedAt: z.string().datetime(),
+  telemetryBlocked: z.boolean(),
 })
 
 const temperatureReadingSchema = z.object({
@@ -147,7 +149,7 @@ export async function listSensorAssignmentOptions() {
 }
 
 export async function listSensorReadings(id) {
-  const readings = z.array(temperatureReadingSchema).max(100).parse((await api.get(`/api/sensors/${id}/readings`)).data)
+  const readings = z.array(temperatureReadingSchema).max(100, 'Pembacaan sensor maksimal 100 entri').parse((await api.get(`/api/sensors/${id}/readings`)).data)
   return sortReadings(readings)
 }
 
@@ -182,6 +184,11 @@ export async function simulateSensorOffline(id) {
   return sensorOfflineResultSchema.parse((await api.post(`/api/debug/demo/sensors/${id}/offline`)).data)
 }
 
+export async function reconnectSensorTelemetry(id) {
+  return z.strictObject({ sensorId: z.string(), reconnectedAt: z.string().datetime() }).parse((await api.post(`/api/debug/demo/sensors/${id}/reconnect`)).data)
+}
+
 export function apiError(error) {
-  return error.response?.data?.error ?? error.message ?? 'Something went wrong'
+  if (error?.response?.data?.error) return error.response.data.error
+  return error?.request && !error.response ? 'Tidak dapat terhubung ke server. Periksa koneksi Anda.' : 'Data sumber daya tidak dapat diproses. Silakan coba lagi.'
 }

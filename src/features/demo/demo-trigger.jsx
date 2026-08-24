@@ -35,10 +35,10 @@ export function DemoTrigger() {
 
   return (
     <>
-      <div className="flex flex-col gap-2 border-t border-border px-2 py-3" aria-label="Demo account actions">
-        <span className="text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">Demo tools</span>
-        <Button className="h-auto w-full whitespace-normal py-2" size="sm" type="button" onClick={() => open('load')}><FlaskConical />Load Demo Data</Button>
-        <Button className="h-auto w-full whitespace-normal py-2" size="sm" variant="destructive-outline" type="button" onClick={() => open('reset')}><RotateCcw />Reset</Button>
+      <div className="flex flex-col gap-2 border-t border-border px-2 py-3" aria-label="Tindakan akun demo">
+        <span className="text-[10px] font-bold tracking-[0.12em] text-muted-foreground uppercase">Alat demo</span>
+        <Button className="h-auto w-full whitespace-normal py-2" size="sm" type="button" onClick={() => open('load')}><FlaskConical />Muat Data Demo</Button>
+        <Button className="h-auto w-full whitespace-normal py-2" size="sm" variant="destructive-outline" type="button" onClick={() => open('reset')}><RotateCcw />Atur Ulang</Button>
       </div>
 
       <Dialog open={action !== null} onOpenChange={(nextOpen) => !nextOpen && close()}>
@@ -47,26 +47,26 @@ export function DemoTrigger() {
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-lg">
               {isReset ? <RotateCcw className="text-destructive" /> : <FlaskConical className="text-primary" />}
-              {isReset ? 'Reset demo account?' : 'Load Demo Data?'}
+              {isReset ? 'Atur ulang akun demo?' : 'Muat Data Demo?'}
             </DialogTitle>
             <DialogDescription>
               {isReset
-                ? 'This removes operational and demo state, then restores the resource-only baseline: 2 cold rooms, 3 trucks, and 3 destinations. Your login and permanent Telegram connection remain; pending conversations and one-time link tokens are cleared.'
-                : 'This replaces the account’s current operational state with a fresh fixed demo scenario: 3 completed fishing trips, 3 active and 3 historical batches, 3 assigned SIM sensors, and 15 readings. Your login and Telegram connection are preserved.'}
+                ? 'Tindakan ini menghapus status operasional dan demo, lalu memulihkan kondisi awal sumber daya: 2 ruang dingin, 3 truk, dan 3 tujuan. Akses akun dan koneksi permanen Telegram Anda tetap tersimpan; percakapan tertunda dan token tautan sekali pakai akan dihapus.'
+                : 'Tindakan ini mengganti status operasional akun saat ini dengan skenario demo tetap yang baru: 3 perjalanan penangkapan ikan selesai, 3 batch aktif dan 3 batch historis, 3 sensor SIM yang ditetapkan, serta 15 pembacaan. Akses akun dan koneksi Telegram Anda tetap tersimpan.'}
             </DialogDescription>
           </DialogHeader>
 
           {mutation.isError && <p className="rounded-lg bg-destructive/10 p-3 text-sm text-destructive" role="alert">{demoError(mutation.error)}</p>}
           {isReset && resetMutation.data && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4" role="status">
-              <strong className="block text-sm">Demo account reset</strong>
-              <p className="mt-1 text-sm text-muted-foreground">Resource baseline restored with 2 cold rooms, 3 trucks, and 3 destinations.</p>
+              <strong className="block text-sm">Akun demo telah diatur ulang</strong>
+              <p className="mt-1 text-sm text-muted-foreground">Kondisi awal sumber daya dipulihkan dengan 2 ruang dingin, 3 truk, dan 3 tujuan.</p>
             </div>
           )}
           {!isReset && loadMutation.data && (
             <div className="rounded-lg border border-primary/20 bg-primary/5 p-4" role="status">
-              <strong className="block text-sm">Operations demo ready</strong>
-              <p className="mt-1 text-sm text-muted-foreground">{loadMutation.data.trips.length} trips · {loadMutation.data.batches.length} batches · {loadMutation.data.sensors.length} assigned sensors · {loadMutation.data.readingCount} readings</p>
+              <strong className="block text-sm">Demo operasi siap</strong>
+              <p className="mt-1 text-sm text-muted-foreground">{loadMutation.data.trips.length} perjalanan · {loadMutation.data.batches.length} batch · {loadMutation.data.sensors.length} sensor ditetapkan · {loadMutation.data.readingCount} pembacaan</p>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
                 {loadMutation.data.batches.map((batch) => {
                   const sensor = loadMutation.data.sensors.find(({ batchCode }) => batchCode === batch.code)
@@ -74,10 +74,10 @@ export function DemoTrigger() {
                     <div className="min-w-0 rounded-md border border-border/70 bg-background/70 px-3 py-2" key={batch.id}>
                       <div className="flex items-baseline justify-between gap-2">
                         <span className="truncate text-xs font-bold text-foreground">{batch.code}</span>
-                        <span className="shrink-0 text-xs font-semibold">{batch.currentTemperatureC === null ? 'Historical' : `${batch.currentTemperatureC.toFixed(1)}°C`}</span>
+                        <span className="shrink-0 text-xs font-semibold">{batch.currentTemperatureC === null ? 'Historis' : `${batch.currentTemperatureC.toFixed(1)}°C`}</span>
                       </div>
-                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{batch.tripCode} · {sensor ? `${sensor.code} · ${sensor.readingCount} readings` : 'No sensor'}</p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">{batch.remainingQualityWindowDays === null ? 'Closed batch' : `${batch.remainingQualityWindowDays.toFixed(1)} days quality window`}</p>
+                      <p className="mt-0.5 truncate text-xs text-muted-foreground">{batch.tripCode} · {sensor ? `${sensor.code} · ${sensor.readingCount} pembacaan` : 'Tanpa sensor'}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">{batch.remainingQualityWindowDays === null ? 'Batch ditutup' : `Sisa masa mutu ${batch.remainingQualityWindowDays.toFixed(1)} hari`}</p>
                     </div>
                   )
                 })}
@@ -86,12 +86,12 @@ export function DemoTrigger() {
           )}
 
           <DialogFooter className="-mx-6 -mb-6 px-6">
-            <Button variant="outline" type="button" onClick={close} disabled={mutation.isPending}>{mutation.data ? 'Close' : 'Cancel'}</Button>
+            <Button variant="outline" type="button" onClick={close} disabled={mutation.isPending}>{mutation.data ? 'Tutup' : 'Batal'}</Button>
             {mutation.data
-              ? <Button type="button" onClick={viewOverview}>View overview</Button>
+              ? <Button type="button" onClick={viewOverview}>Lihat ringkasan</Button>
               : <Button variant={isReset ? 'destructive' : 'default'} type="button" onClick={() => mutation.mutate()} disabled={mutation.isPending}>
                   {mutation.isPending ? <LoaderCircle className="animate-spin" /> : isReset ? <RotateCcw /> : <FlaskConical />}
-                  {mutation.isPending ? (isReset ? 'Resetting…' : 'Loading demo data…') : (isReset ? 'Reset account' : 'Load Demo Data')}
+                  {mutation.isPending ? (isReset ? 'Mengatur ulang…' : 'Memuat data demo…') : (isReset ? 'Atur ulang akun' : 'Muat Data Demo')}
                 </Button>}
           </DialogFooter>
         </DialogContent>

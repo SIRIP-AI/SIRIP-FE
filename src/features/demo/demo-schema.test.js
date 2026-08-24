@@ -11,11 +11,11 @@ const result = {
   generatedAt: '2026-08-21T12:00:00.000Z',
 }
 
-test('demoResultSchema accepts the plural operations demo response', () => {
+test('demoResultSchema menerima respons demo operasi berbentuk jamak', () => {
   assert.deepEqual(demoResultSchema.parse(result), result)
 })
 
-test('demoResultSchema rejects the former singular response', () => {
+test('demoResultSchema menolak respons tunggal lama', () => {
   assert.equal(demoResultSchema.safeParse({ ...result, trips: undefined, trip: result.trips[0] }).success, false)
 })
 
@@ -26,11 +26,11 @@ const resetResult = {
   sessionPreserved: true,
 }
 
-test('demoResetResultSchema accepts the exact reset response', () => {
+test('demoResetResultSchema menerima respons atur ulang yang tepat', () => {
   assert.deepEqual(demoResetResultSchema.parse(resetResult), resetResult)
 })
 
-test('demoResetResultSchema rejects invalid counts and contract drift', () => {
+test('demoResetResultSchema menolak jumlah tidak valid dan penyimpangan kontrak', () => {
   assert.equal(demoResetResultSchema.safeParse({ ...resetResult, deleted: { ...resetResult.deleted, batches: -1 } }).success, false)
   assert.equal(demoResetResultSchema.safeParse({ ...resetResult, restored: { resources: 7 } }).success, false)
   assert.equal(demoResetResultSchema.safeParse({ ...resetResult, extra: true }).success, false)

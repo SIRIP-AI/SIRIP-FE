@@ -18,5 +18,7 @@ export async function disconnectTelegram() {
 }
 
 export function telegramError(error) {
-  return error.response?.data?.error ?? error.message ?? 'Telegram is unavailable'
+  return error.response?.status === 401
+    ? 'Sesi Anda telah berakhir. Silakan masuk kembali.'
+    : 'Telegram tidak tersedia. Silakan coba lagi.'
 }

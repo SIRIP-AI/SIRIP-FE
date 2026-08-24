@@ -18,7 +18,7 @@ const overviewSchema = z.object({
     qualityStatus: z.enum(['NORMAL', 'WARNING', 'CRITICAL', 'UNKNOWN']),
     sensor: z.object({
       code: z.string(),
-      connectivityStatus: z.enum(['ONLINE', 'OFFLINE', 'ERROR', 'NEVER_CONNECTED', 'UNASSIGNED']),
+      connectivityStatus: z.enum(['ONLINE', 'SYNCING', 'OFFLINE', 'ERROR', 'NEVER_CONNECTED', 'UNASSIGNED']),
     }).nullable(),
   })),
   activePlan: z.object({

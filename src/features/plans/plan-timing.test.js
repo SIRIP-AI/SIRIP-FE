@@ -3,9 +3,9 @@ import { test } from 'node:test'
 
 import { formatDuration } from './plan-timing.js'
 
-test('formats exact durations without rounding away smaller units', () => {
-  assert.equal(formatDuration(0), '0 seconds')
-  assert.equal(formatDuration(1), '1 second')
-  assert.equal(formatDuration(90), '1 minute 30 seconds')
-  assert.equal(formatDuration(90_061), '1 day 1 hour 1 minute 1 second')
+test('memformat durasi tepat dalam bahasa Indonesia tanpa membulatkan unit yang lebih kecil', () => {
+  assert.equal(formatDuration(0), '0 detik')
+  assert.equal(formatDuration(1), '1 detik')
+  assert.equal(formatDuration(90), '1 menit 30 detik')
+  assert.equal(formatDuration(90_061), '1 hari 1 jam 1 menit 1 detik')
 })
