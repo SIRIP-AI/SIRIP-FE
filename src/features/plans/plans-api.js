@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
 import { api } from '@/lib/axios.js'
+import { createPlanChangeResultSchema } from './plan-change-schema.js'
 
 const isoDateTimeSchema = z.string().datetime({ offset: true })
 const planIdSchema = z.string().regex(/^[1-9]\d*$/)
@@ -77,6 +78,7 @@ const generationResultSchema = z.discriminatedUnion('status', [
   z.strictObject({ status: z.literal('PROPOSAL'), proposal: planSchema }),
   z.strictObject({ status: z.literal('NO_VALID_PROPOSAL_FOUND'), reason: z.string().min(1) }),
 ])
+export const planChangeResultSchema = createPlanChangeResultSchema(generationResultSchema)
 
 const plansSchema = z.strictObject({
   updatedAt: isoDateTimeSchema,
@@ -108,6 +110,12 @@ export async function createPlanRevision(planId, instruction) {
   const safePlanId = planIdSchema.parse(planId)
   const input = z.string().trim().min(1).max(2000).parse(instruction)
   return generationResultSchema.parse((await api.post(`/api/plans/${encodeURIComponent(safePlanId)}/revisions`, { instruction: input })).data)
+}
+
+export async function submitPlanChange(planId, instruction) {
+  const safePlanId = planIdSchema.parse(planId)
+  const input = z.string().trim().min(1).max(2000).parse(instruction)
+  return planChangeResultSchema.parse((await api.post(`/api/plans/${encodeURIComponent(safePlanId)}/changes`, { instruction: input, idempotencyKey: crypto.randomUUID() })).data)
 }
 
 export async function approvePlan(planId) {

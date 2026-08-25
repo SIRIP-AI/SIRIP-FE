@@ -59,6 +59,8 @@ Define API calls and query options in the owning feature. Use TanStack Query for
 
 Planning generation is a strict `PROPOSAL | NO_VALID_PROPOSAL_FOUND` union. Every plan includes strict `timing` metadata with `ON_TIME | DELAYED` status, an exact nonnegative delay in seconds, and deterministic warning or critical reasons. Render unsuccessful runs without assuming a proposal exists, show step rationale as explanation rather than authority, and display both vehicle and destination for dispatch actions.
 
+Plan-page changes are either applied operational reports or constrained preference revisions. Applied reports update authoritative state immediately and may remain persisted even when no replacement proposal is available; replacement plans always require review and approval. Plan summaries and general step rationales may be AI-authored, while timing rationale, latest-safe timestamps, warnings, actions, resources, and schedules remain deterministic and must be presented as authoritative.
+
 Use routes to compose feature pages rather than placing product behavior in `App.jsx`. Build responsive, accessible interfaces that follow the UI guide, never communicate status by color alone, and keep proposed AI actions visually distinct from active plans.
 
 ## Development
