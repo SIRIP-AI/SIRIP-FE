@@ -8,7 +8,10 @@ Sirip Frontend
 
 ## Running the Application
 
-Paste the `.env` we have provided into the root folder, then:
+### Clone the Repository
+```bash
+git clone https://github.com/SIRIP-AI/SIRIP-FE
+```
 
 ### Install Dependencies & Run
 
